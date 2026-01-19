@@ -1,0 +1,17 @@
+@startuml packages_api_specific
+set namespaceSeparator none
+package "detection_rules.api_specific" as detection_rules.api_specific {
+}
+package "detection_rules.api_specific.chain_indexing_smell" as detection_rules.api_specific.chain_indexing_smell {
+}
+package "detection_rules.api_specific.dataframe_conversion_api_misused" as detection_rules.api_specific.dataframe_conversion_api_misused {
+}
+package "detection_rules.api_specific.gradients_not_cleared_before_backward_propagation" as detection_rules.api_specific.gradients_not_cleared_before_backward_propagation {
+}
+package "detection_rules.api_specific.matrix_multiplication_api_misused" as detection_rules.api_specific.matrix_multiplication_api_misused {
+}
+package "detection_rules.api_specific.pytorch_call_method_misused" as detection_rules.api_specific.pytorch_call_method_misused {
+}
+package "detection_rules.api_specific.tensor_array_not_used" as detection_rules.api_specific.tensor_array_not_used {
+}
+@enduml

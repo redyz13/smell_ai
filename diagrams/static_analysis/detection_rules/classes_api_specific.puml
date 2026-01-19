@@ -1,0 +1,21 @@
+@startuml classes_api_specific
+set namespaceSeparator none
+class "ChainIndexingSmell" as detection_rules.api_specific.chain_indexing_smell.ChainIndexingSmell {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+class "DataFrameConversionAPIMisused" as detection_rules.api_specific.dataframe_conversion_api_misused.DataFrameConversionAPIMisused {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+class "GradientsNotClearedSmell" as detection_rules.api_specific.gradients_not_cleared_before_backward_propagation.GradientsNotClearedSmell {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+class "MatrixMultiplicationAPIMisused" as detection_rules.api_specific.matrix_multiplication_api_misused.MatrixMultiplicationAPIMisused {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+class "PyTorchCallMethodMisusedSmell" as detection_rules.api_specific.pytorch_call_method_misused.PyTorchCallMethodMisusedSmell {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+class "TensorArrayNotUsedSmell" as detection_rules.api_specific.tensor_array_not_used.TensorArrayNotUsedSmell {
+  detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+}
+@enduml

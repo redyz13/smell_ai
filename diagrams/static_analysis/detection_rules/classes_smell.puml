@@ -1,0 +1,9 @@
+@startuml classes_smell
+set namespaceSeparator none
+class "Smell" as detection_rules.smell.Smell {
+  description : str
+  name : str
+  {abstract}detect(ast_node: ast.AST, extracted_data: dict[str, any]) -> list[dict[str, any]]
+  format_smell(line: int, additional_info: str) -> dict[str, any]
+}
+@enduml
