@@ -31,8 +31,7 @@ describe('Upload Project Page', () => {
     cy.get('#removeButton').click();
   });
 
-  it('should allow the user to add a project and view analysis result', async () => {
-
+  it('should allow the user to add a project and view analysis result', () => {
     cy.contains('Static Tool').click();
 
     const file1 = 'model_training_and_evaluation/model.py';
@@ -40,19 +39,13 @@ describe('Upload Project Page', () => {
 
     cy.contains('Add Project').click();
 
-    await Promise.all([
-        cy.fixture(file1, 'utf8').then((fileContent) => ({
-        fileContent,
-        fileName: "model.py",
-        mimeType: 'text/x-python',
-        })),
-        cy.fixture(file2, 'utf8').then((fileContent) => ({
-        fileContent,
-        fileName: "dataset_preparation.py",
-        mimeType: 'text/x-python',
-        }))
-    ]).then((files) => {
-        cy.get('[data-testid="file-input"]').attachFile(files);
+    cy.fixture(file1, 'utf8').then((fileContent1) => {
+      cy.fixture(file2, 'utf8').then((fileContent2) => {
+        cy.get('[data-testid="file-input"]').attachFile([
+          { fileContent: fileContent1, fileName: "model.py", mimeType: 'text/x-python' },
+          { fileContent: fileContent2, fileName: "dataset_preparation.py", mimeType: 'text/x-python' },
+        ]);
+      });
     });
 
     cy.contains('Upload and Analyze All Projects').click();
@@ -61,8 +54,7 @@ describe('Upload Project Page', () => {
     cy.contains('View Analysis Result').click();
   });
 
-  it('should allow the user to add a project and view analysis result (ai)', async () => {
-
+  it('should allow the user to add a project and view analysis result (ai)', () => {
     cy.contains('AI-Based').click();
 
     const file1 = 'model_training_and_evaluation/model.py';
@@ -70,19 +62,13 @@ describe('Upload Project Page', () => {
 
     cy.contains('Add Project').click();
 
-    await Promise.all([
-        cy.fixture(file1, 'utf8').then((fileContent) => ({
-        fileContent,
-        fileName: "model.py",
-        mimeType: 'text/x-python',
-        })),
-        cy.fixture(file2, 'utf8').then((fileContent) => ({
-        fileContent,
-        fileName: "dataset_preparation.py",
-        mimeType: 'text/x-python',
-        }))
-    ]).then((files) => {
-        cy.get('[data-testid="file-input"]').attachFile(files);
+    cy.fixture(file1, 'utf8').then((fileContent1) => {
+      cy.fixture(file2, 'utf8').then((fileContent2) => {
+        cy.get('[data-testid="file-input"]').attachFile([
+          { fileContent: fileContent1, fileName: "model.py", mimeType: 'text/x-python' },
+          { fileContent: fileContent2, fileName: "dataset_preparation.py", mimeType: 'text/x-python' },
+        ]);
+      });
     });
 
     cy.contains('Upload and Analyze All Projects').click();
@@ -95,10 +81,10 @@ describe('Upload Project Page', () => {
 
     cy.contains('Static Tool').click();
     // Stub the API call to simulate a failure
-    cy.intercept('POST', '/api/detect_smell_static', {
+    cy.intercept('POST', '**/detect_smell_static*', {
       statusCode: 500,
       body: { error: 'Internal Server Error' },
-    }).as('apiFailure');;
+    }).as('apiFailure');
 
     cy.contains('Add Project').click();
 
@@ -110,7 +96,9 @@ describe('Upload Project Page', () => {
 
     cy.get('[data-testid="file-input"]').attachFile(validFile);
     cy.contains('Upload and Analyze All Projects').click();
-    cy.wait('@apiFailure');
-    cy.contains('Analysis failed for snippet:', { timeout: 10000 }).should('be.visible');
+
+    cy.wait('@apiFailure').its('response.statusCode').should('eq', 500);
+
+    cy.contains('Analysis failed for snippet:', { timeout: 10000 }).should('exist');
   });
 });
