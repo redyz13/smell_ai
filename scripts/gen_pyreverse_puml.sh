@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # Usage:
-#   ./gen_pyreverse_puml.sh <project_name_or_path> <output_base_dir>
+#   ./scripts/gen_pyreverse_puml.sh <project_name_or_path> <output_base_dir>
 #
 # Examples:
-#   ./gen_pyreverse_puml.sh gui diagrams/static_analysis
-#   ./gen_pyreverse_puml.sh code_extractor/ diagrams/static_analysis
-#   ./gen_pyreverse_puml.sh code_extractor diagrams/static_analysis
+#   ./scripts/gen_pyreverse_puml.sh gui diagrams/static_analysis
+#   ./scripts/gen_pyreverse_puml.sh code_extractor/ diagrams/static_analysis
+#   ./scripts/gen_pyreverse_puml.sh code_extractor diagrams/static_analysis
 #
 # Output:
 #   <output_base_dir>/<project_name>/classes_<project_name>.puml
@@ -19,6 +19,9 @@ if [[ $# -ne 2 ]]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 INPUT_TARGET="$1"
 OUTPUT_BASE="$2"
 
@@ -27,6 +30,8 @@ OUTPUT_BASE="$2"
 # - keep only the last path component as project name
 INPUT_TARGET="${INPUT_TARGET%/}"
 PROJECT_NAME="$(basename "${INPUT_TARGET}")"
+
+cd "${REPO_ROOT}"
 
 # Run pyreverse on the given target
 pyreverse -o puml -p "${PROJECT_NAME}" "${INPUT_TARGET}"
