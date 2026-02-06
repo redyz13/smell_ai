@@ -3,23 +3,31 @@ import tkinter as tk
 from gui.code_smell_detector_gui import CodeSmellDetectorGUI
 
 
+@pytest.fixture(scope="session")
+def tk_root():
+    root = tk.Tk()
+    root.withdraw()
+    yield root
+    root.destroy()
+
+
 @pytest.fixture
-def gui(mocker):
+def gui(mocker, tk_root):
     """
     Fixture to create a tkinter root window
     and initialize the CodeSmellDetectorGUI.
     Mock Tk and other tkinter dialog
     components to avoid errors in headless environments.
     """
+    for child in tk_root.winfo_children():
+        child.destroy()
 
-    mocker.patch("tkinter.Tk", return_value=tk.Tk())
-
-    root = tk.Tk()
-    gui = CodeSmellDetectorGUI(root)
+    gui = CodeSmellDetectorGUI(tk_root)
     yield gui
-    root.quit()
-    root.update()
-    root.destroy()
+
+    for child in tk_root.winfo_children():
+        child.destroy()
+    tk_root.update_idletasks()
 
 
 def test_choose_input_path(gui, mocker):
