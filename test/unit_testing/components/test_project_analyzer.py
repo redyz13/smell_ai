@@ -459,10 +459,10 @@ def test_analyze_project_empty_directory(
         "utils.file_utils.FileUtils.get_python_files", lambda _: []
     )
 
-    # Run the method
-    total_smells = project_analyzer.analyze_project(
-        "test/unit_testing/components/mock_project_path"
-    )
+    project_path = "test/unit_testing/components/mock_project_path"
 
-    # Assert that no smells are found
-    assert total_smells == 0
+    with pytest.raises(ValueError) as excinfo:
+        # Run the method
+        project_analyzer.analyze_project(project_path)
+
+    assert f"The project '{project_path}' contains no Python files." == str(excinfo.value)
