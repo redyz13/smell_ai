@@ -65,27 +65,30 @@ def test_analyze_project(
     )
 
     # Mock inspection results for two files
+    df1 = pd.DataFrame(
+        {
+            "filename": ["file1.py"],
+            "function_name": ["func1"],
+            "smell_name": ["smell1"],
+            "line": [10],
+            "description": ["desc1"],
+            "additional_info": ["info1"],
+        }
+    )
+    df2 = pd.DataFrame(
+        {
+            "filename": ["file2.py"],
+            "function_name": ["func2"],
+            "smell_name": ["smell2"],
+            "line": [20],
+            "description": ["desc2"],
+            "additional_info": ["info2"],
+        }
+    )
+
     mock_inspection_results = [
-        pd.DataFrame(
-            {
-                "filename": ["file1.py"],
-                "function_name": ["func1"],
-                "smell_name": ["smell1"],
-                "line": [10],
-                "description": ["desc1"],
-                "additional_info": ["info1"],
-            }
-        ),
-        pd.DataFrame(
-            {
-                "filename": ["file2.py"],
-                "function_name": ["func2"],
-                "smell_name": ["smell2"],
-                "line": [20],
-                "description": ["desc2"],
-                "additional_info": ["info2"],
-            }
-        ),
+        (df1, {"file": "file1.py", "nodes": [], "edges": []}),
+        (df2, {"file": "file2.py", "nodes": [], "edges": []}),
     ]
 
     # Mock inspect method to return the inspection results
@@ -106,8 +109,12 @@ def test_analyze_project(
 
     # Assertions
     assert total_smells == 2  # Expecting 2 smells (from file1.py and file2.py)
-    project_analyzer.inspector.inspect.assert_any_call("file1.py")
-    project_analyzer.inspector.inspect.assert_any_call("file2.py")
+    project_analyzer.inspector.inspect.assert_any_call(
+        "file1.py", include_callgraph=True
+    )
+    project_analyzer.inspector.inspect.assert_any_call(
+        "file2.py", include_callgraph=True
+    )
 
     mock_project_path = "test/unit_testing/components/mock_project_path"
     if os.path.exists(mock_project_path):
@@ -143,7 +150,7 @@ def test_analyze_projects_sequential(
         }
     )
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=mock_inspection_results
+        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
     )
 
     # Call the method
@@ -152,7 +159,9 @@ def test_analyze_projects_sequential(
     )
 
     # Ensure inspect was called
-    project_analyzer.inspector.inspect.assert_called_with("file1.py")
+    project_analyzer.inspector.inspect.assert_called_with(
+        "file1.py", include_callgraph=True
+    )
 
     mock_project_path = "test/unit_testing/components/mock_project_path"
     if os.path.exists(mock_project_path):
@@ -227,7 +236,7 @@ def test_analyze_projects_parallel(
 
     # Mock the inspector's inspect method
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=mock_inspection_results
+        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
     )
 
     # Mock save results method
@@ -359,7 +368,7 @@ def test_analyze_projects_sequential_save_results(
         }
     )
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=mock_inspection_results
+        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
     )
 
     # Call the method
@@ -405,7 +414,7 @@ def test_analyze_projects_parallel_thread_safety(
 
     # Mock the inspector's inspect method
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=mock_inspection_results
+        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
     )
 
     # Mock the synchronized_append_to_log method to check for thread-safety
