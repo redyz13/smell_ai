@@ -27,15 +27,18 @@ class CodeSmileCLI:
             print("Error: Please specify both input and output folders.")
             exit(1)
 
-        # Validate max_walkers for parallel execution
         if self.args.parallel and self.args.max_walkers <= 0:
             raise ValueError("max_walkers must be greater than 0.")
+
+        if self.args.callgraph_output and not self.args.enable_callgraph:
+            raise ValueError(
+                "--callgraph-output requires --enable-callgraph."
+            )
 
     def execute(self):
         """
         Executes the analysis workflow based on CLI arguments.
         """
-        # Validate arguments first
         self.validate_args()
 
         print("Starting analysis with the following configuration:")
@@ -45,27 +48,44 @@ class CodeSmileCLI:
         print(f"Resume execution: {self.args.resume}")
         print(f"Max Walkers: {self.args.max_walkers}")
         print(f"Analyze multiple projects: {self.args.multiple}")
+        print(f"Enable call graph: {self.args.enable_callgraph}")
+        print(f"Call graph output: {self.args.callgraph_output}")
+        print(f"Exclude paths: {self.args.exclude_paths}")
+        print(f"Report format: {self.args.format}")
 
         if not self.args.resume:
             self.analyzer.clean_output_directory()
 
+        analysis_kwargs = {
+            "enable_callgraph": self.args.enable_callgraph,
+            "callgraph_output": self.args.callgraph_output,
+            "exclude_paths": self.args.exclude_paths,
+            "report_format": self.args.format,
+        }
+
         if self.args.multiple:
             if self.args.parallel:
                 self.analyzer.analyze_projects_parallel(
-                    self.args.input, self.args.max_walkers
+                    self.args.input,
+                    self.args.max_walkers,
+                    **analysis_kwargs,
                 )
             else:
                 self.analyzer.analyze_projects_sequential(
-                    self.args.input, resume=self.args.resume
+                    self.args.input,
+                    resume=self.args.resume,
+                    **analysis_kwargs,
                 )
         else:
-            total_smells = self.analyzer.analyze_project(self.args.input)
+            total_smells = self.analyzer.analyze_project(
+                self.args.input, **analysis_kwargs
+            )
             print(
                 f"Analysis completed. Total code smells found: {total_smells}"
             )
 
         if self.args.multiple:
-            self.analyzer.merge_all_results()
+            self.analyzer.merge_all_results(report_format=self.args.format)
 
         print("Analysis results saved successfully.")
 
@@ -103,16 +123,37 @@ def main():
         help="Analyze multiple projects (default: False)",
     )
 
-    # Parse arguments
+    parser.add_argument(
+        "--enable-callgraph",
+        action="store_true",
+        help="Enable Call Graph generation (default: False)",
+    )
+    parser.add_argument(
+        "--callgraph-output",
+        type=str,
+        default=None,
+        help="Output path for the generated Call Graph file",
+    )
+    parser.add_argument(
+        "--exclude-paths",
+        nargs="*",
+        default=[],
+        help="Paths to exclude from analysis",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["csv", "json"],
+        default="csv",
+        help="Output format for smells report (default: csv)",
+    )
+
     try:
         args = parser.parse_args()
     except SystemExit:
-        # SystemExit will be raised automatically for missing arguments
         print("Error: Missing required arguments or invalid input.\n")
         parser.print_help()
         sys.exit(1)
 
-    # Execute main logic
     print("Starting Code Smile analysis...")
     manager = CodeSmileCLI(args)
     manager.execute()

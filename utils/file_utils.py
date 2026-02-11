@@ -38,18 +38,52 @@ class FileUtils:
         return output_path
 
     @staticmethod
-    def get_python_files(path: str) -> list[str]:
+    def _normalize_exclude_paths(exclude_paths, base_path: str) -> list[str]:
+        if not exclude_paths:
+            return []
+
+        normalized = []
+        for p in exclude_paths:
+            if not p:
+                continue
+            abs_p = (
+                os.path.abspath(os.path.join(base_path, p))
+                if not os.path.isabs(p)
+                else os.path.abspath(p)
+            )
+            normalized.append(os.path.normpath(abs_p))
+        return normalized
+
+    @staticmethod
+    def _is_excluded(file_path: str, excluded_paths: list[str]) -> bool:
+        if not excluded_paths:
+            return False
+        f = os.path.normpath(os.path.abspath(file_path))
+        for ex in excluded_paths:
+            if f == ex or f.startswith(ex + os.sep):
+                return True
+        return False
+
+    @staticmethod
+    def get_python_files(path: str, exclude_paths=None) -> list[str]:
         """
         Retrieves all Python files from the specified path.
 
         Parameters:
         - path (str): Path to search for Python files.
+        - exclude_paths: Optional list of paths (absolute or relative to `path`)
+          to exclude from discovery.
 
         Returns:
         - list[str]: List of Python file paths.
         """
         result = []
+        base_path = path if os.path.isdir(path) else os.path.dirname(path)
+        excluded = FileUtils._normalize_exclude_paths(exclude_paths, base_path)
+
         if os.path.isfile(path) and path.endswith(".py"):
+            if FileUtils._is_excluded(path, excluded):
+                return []
             return [path]
 
         for root, dirs, files in os.walk(path):
@@ -57,27 +91,54 @@ class FileUtils:
                 dirs.remove("venv")
             if "lib" in dirs:
                 dirs.remove("lib")
+
+            # prune excluded directories
+            dirs[:] = [
+                d
+                for d in dirs
+                if not FileUtils._is_excluded(os.path.join(root, d), excluded)
+            ]
+
             for file in files:
                 if file.endswith(".py"):
-                    result.append(os.path.abspath(os.path.join(root, file)))
+                    file_path = os.path.abspath(os.path.join(root, file))
+                    if FileUtils._is_excluded(file_path, excluded):
+                        continue
+                    result.append(file_path)
+
         return result
 
     @staticmethod
-    def merge_results(input_dir: str, output_dir: str):
+    def merge_results(input_dir: str, output_dir: str, report_format: str = "csv"):
         """
-        Merges analysis results from multiple projects into a single CSV.
+        Merges analysis results from multiple projects into a single report.
 
         Parameters:
-        - input_dir (str): Directory containing
-          analysis results (project_name.csv files).
+        - input_dir (str): Directory containing analysis results.
         - output_dir (str): Directory where the merged results will be saved.
+        - report_format (str): "csv" (default) or "json".
         """
         dataframes = []
-        print(f"Looking for CSV files in directory: {input_dir}")
+
+        if report_format == "json":
+            print(f"Looking for JSON files in directory: {input_dir}")
+        else:
+            print(f"Looking for CSV files in directory: {input_dir}")
 
         for subdir, _, files in os.walk(input_dir):
             for file in files:
-                if file.endswith(".csv"):
+                if report_format == "json" and file.endswith(".json"):
+                    file_path = os.path.join(subdir, file)
+                    try:
+                        df = pd.read_json(file_path)
+                        if not df.empty:
+                            dataframes.append(df)
+                        else:
+                            print(f"Skipping empty JSON: {file_path}")
+                    except Exception as e:
+                        print(f"Failed to read {file_path}: {e}")
+
+                if report_format != "json" and file.endswith(".csv"):
                     file_path = os.path.join(subdir, file)
                     try:
                         df = pd.read_csv(file_path)
@@ -91,12 +152,20 @@ class FileUtils:
         if dataframes:
             combined_df = pd.concat(dataframes, ignore_index=True)
             os.makedirs(output_dir, exist_ok=True)
-            combined_df.to_csv(
-                os.path.join(output_dir, "overview.csv"), index=False
-            )
-            print(f"Merged results saved to {output_dir}/overview.csv")
+
+            if report_format == "json":
+                out_path = os.path.join(output_dir, "overview.json")
+                combined_df.to_json(out_path, orient="records", indent=2)
+                print(f"Merged results saved to {out_path}")
+            else:
+                out_path = os.path.join(output_dir, "overview.csv")
+                combined_df.to_csv(out_path, index=False)
+                print(f"Merged results saved to {out_path}")
         else:
-            print("No valid CSV files found to merge.")
+            if report_format == "json":
+                print("No valid JSON files found to merge.")
+            else:
+                print("No valid CSV files found to merge.")
 
     @staticmethod
     def initialize_log(log_path: str):

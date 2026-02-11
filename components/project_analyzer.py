@@ -34,9 +34,9 @@ class ProjectAnalyzer:
         """
         FileUtils.clean_directory(self.base_output_path, "output")
 
-    def _save_results(self, df: pd.DataFrame, filename: str):
+    def _save_results(self, df: pd.DataFrame, filename: str, report_format: str = "csv"):
         """
-        Saves the DataFrame to a CSV file in the output root folder.
+        Saves the DataFrame to a file in the output root folder.
         """
         if df.empty:
             print(f"No results to save for {filename}")
@@ -44,11 +44,90 @@ class ProjectAnalyzer:
 
         os.makedirs(self.output_path, exist_ok=True)
 
-        file_path = os.path.join(self.output_path, filename)
-        df.to_csv(file_path, index=False)
+        base, _ = os.path.splitext(filename)
+        if report_format == "json":
+            file_path = os.path.join(self.output_path, f"{base}.json")
+            df.to_json(file_path, orient="records", indent=2)
+        else:
+            file_path = os.path.join(self.output_path, f"{base}.csv")
+            df.to_csv(file_path, index=False)
+
         print(f"Results saved to {file_path}")
 
-    def analyze_project(self, project_path: str) -> int:
+    def _normalize_exclude_paths(self, exclude_paths, base_path: str):
+        if not exclude_paths:
+            return []
+
+        normalized = []
+        for p in exclude_paths:
+            if not p:
+                continue
+            abs_p = os.path.abspath(os.path.join(base_path, p)) if not os.path.isabs(p) else os.path.abspath(p)
+            normalized.append(os.path.normpath(abs_p))
+        return normalized
+
+    def _filter_excluded_files(self, filenames, exclude_paths, base_path: str):
+        if not filenames:
+            return []
+
+        excluded = self._normalize_exclude_paths(exclude_paths, base_path)
+        if not excluded:
+            return filenames
+
+        kept = []
+        for f in filenames:
+            abs_f = os.path.normpath(os.path.abspath(f))
+            if any(abs_f.startswith(ex + os.sep) or abs_f == ex for ex in excluded):
+                continue
+            kept.append(f)
+        return kept
+
+    def _resolve_callgraph_output_path(
+        self,
+        *,
+        project_path: str,
+        project_name: str,
+        callgraph_output: str | None,
+        multiple: bool,
+    ) -> str:
+        if not callgraph_output:
+            if multiple:
+                details_path = os.path.join(self.output_path, "project_details")
+                os.makedirs(details_path, exist_ok=True)
+                return os.path.join(details_path, f"{project_name}_callgraph.json")
+            os.makedirs(self.output_path, exist_ok=True)
+            return os.path.join(self.output_path, "callgraph.json")
+
+        out = os.path.abspath(callgraph_output)
+        out_dir = os.path.dirname(out)
+
+        if not multiple:
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+            return out
+
+        # Multiple projects: if user gave a directory (existing or intended), write per-project inside it.
+        _, ext = os.path.splitext(out)
+        if os.path.isdir(out) or out.endswith(os.sep) or (multiple and ext == ""):
+            os.makedirs(out, exist_ok=True)
+            return os.path.join(out, f"{project_name}_callgraph.json")
+
+        # Multiple projects: user gave a file path -> suffix project name before extension.
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        base, ext = os.path.splitext(out)
+        if not ext:
+            ext = ".json"
+        return f"{base}_{project_name}{ext}"
+
+    def analyze_project(
+        self,
+        project_path: str,
+        enable_callgraph: bool = False,
+        callgraph_output: str | None = None,
+        exclude_paths=None,
+        report_format: str = "csv",
+    ) -> int:
         """
         Analyzes a single project for code smells.
 
@@ -63,8 +142,11 @@ class ProjectAnalyzer:
         print(f"Starting analysis for project: {project_name}")
 
         filenames = FileUtils.get_python_files(project_path)
+        filenames = self._filter_excluded_files(filenames, exclude_paths, project_path)
+
         if not filenames:
             raise ValueError(f"The project '{project_path}' contains no Python files.")
+
         col = [
             "filename",
             "function_name",
@@ -80,8 +162,16 @@ class ProjectAnalyzer:
 
         for filename in filenames:
             try:
-                result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
-                callgraph_fragments.append(callgraph_fragment)
+                inspected = self.inspector.inspect(filename, include_callgraph=enable_callgraph)
+
+                if enable_callgraph:
+                    if isinstance(inspected, tuple) and len(inspected) == 2:
+                        result, callgraph_fragment = inspected
+                        callgraph_fragments.append(callgraph_fragment)
+                    else:
+                        result = inspected
+                else:
+                    result = inspected[0] if isinstance(inspected, tuple) else inspected
 
                 smell_count = len(result)
                 total_smells += smell_count
@@ -98,15 +188,20 @@ class ProjectAnalyzer:
                 print(f"Error analyzing file: {filename} - {str(e)}")
                 continue
 
-        self._save_results(to_save, "overview.csv")
+        self._save_results(to_save, "overview.csv", report_format=report_format)
 
-        builder = CallGraphBuilder()
-        callgraph = builder.build(callgraph_fragments, project_root=project_path)
+        if enable_callgraph:
+            builder = CallGraphBuilder()
+            callgraph = builder.build(callgraph_fragments, project_root=project_path)
 
-        os.makedirs(self.output_path, exist_ok=True)
-        cg_path = os.path.join(self.output_path, "callgraph.json")
-        builder.save(callgraph, cg_path)
-        print(f"Call graph saved to {cg_path}")
+            cg_path = self._resolve_callgraph_output_path(
+                project_path=project_path,
+                project_name=project_name,
+                callgraph_output=callgraph_output,
+                multiple=False,
+            )
+            builder.save(callgraph, cg_path)
+            print(f"Call graph saved to {cg_path}")
 
         print(f"Finished analysis for project: {project_name}")
         print(
@@ -116,7 +211,13 @@ class ProjectAnalyzer:
         return total_smells
 
     def analyze_projects_sequential(
-        self, base_path: str, resume: bool = False
+        self,
+        base_path: str,
+        resume: bool = False,
+        enable_callgraph: bool = False,
+        callgraph_output: str | None = None,
+        exclude_paths=None,
+        report_format: str = "csv",
     ):
         """
         Sequentially analyzes multiple projects.
@@ -156,6 +257,7 @@ class ProjectAnalyzer:
             print(f"Analyzing project '{dirname}' sequentially...")
             try:
                 filenames = FileUtils.get_python_files(project_path)
+                filenames = self._filter_excluded_files(filenames, exclude_paths, project_path)
 
                 col = [
                     "filename",
@@ -171,8 +273,16 @@ class ProjectAnalyzer:
 
                 for filename in filenames:
                     try:
-                        result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
-                        callgraph_fragments.append(callgraph_fragment)
+                        inspected = self.inspector.inspect(filename, include_callgraph=enable_callgraph)
+
+                        if enable_callgraph:
+                            if isinstance(inspected, tuple) and len(inspected) == 2:
+                                result, callgraph_fragment = inspected
+                                callgraph_fragments.append(callgraph_fragment)
+                            else:
+                                result = inspected
+                        else:
+                            result = inspected[0] if isinstance(inspected, tuple) else inspected
 
                         smell_count = len(result)
                         project_smells += smell_count
@@ -200,18 +310,29 @@ class ProjectAnalyzer:
                 os.makedirs(details_path, exist_ok=True)
 
                 if not to_save.empty:
-                    detailed_file_path = os.path.join(
-                        details_path, f"{dirname}_results.csv"
-                    )
-                    to_save.to_csv(detailed_file_path, index=False)
+                    base_name = f"{dirname}_results.csv"
+                    base, _ = os.path.splitext(base_name)
+                    if report_format == "json":
+                        detailed_file_path = os.path.join(details_path, f"{base}.json")
+                        to_save.to_json(detailed_file_path, orient="records", indent=2)
+                    else:
+                        detailed_file_path = os.path.join(details_path, f"{base}.csv")
+                        to_save.to_csv(detailed_file_path, index=False)
+
                     print(f"Detailed results saved to {detailed_file_path}")
 
-                builder = CallGraphBuilder()
-                callgraph = builder.build(callgraph_fragments, project_root=project_path)
+                if enable_callgraph:
+                    builder = CallGraphBuilder()
+                    callgraph = builder.build(callgraph_fragments, project_root=project_path)
 
-                cg_path = os.path.join(details_path, f"{dirname}_callgraph.json")
-                builder.save(callgraph, cg_path)
-                print(f"Call graph saved to {cg_path}")
+                    cg_path = self._resolve_callgraph_output_path(
+                        project_path=project_path,
+                        project_name=dirname,
+                        callgraph_output=callgraph_output,
+                        multiple=True,
+                    )
+                    builder.save(callgraph, cg_path)
+                    print(f"Call graph saved to {cg_path}")
 
                 total_smells += project_smells
                 print(
@@ -230,7 +351,15 @@ class ProjectAnalyzer:
         )
         print(f"Total code smells found in all projects: {total_smells}\n")
 
-    def analyze_projects_parallel(self, base_path: str, max_workers: int):
+    def analyze_projects_parallel(
+        self,
+        base_path: str,
+        max_workers: int,
+        enable_callgraph: bool = False,
+        callgraph_output: str | None = None,
+        exclude_paths=None,
+        report_format: str = "csv",
+    ):
         """
         Analyzes multiple projects in parallel.
 
@@ -260,6 +389,7 @@ class ProjectAnalyzer:
             print(f"Analyzing project '{dirname}' in parallel...")
             try:
                 filenames = FileUtils.get_python_files(project_path)
+                filenames = self._filter_excluded_files(filenames, exclude_paths, project_path)
 
                 col = [
                     "filename",
@@ -275,8 +405,16 @@ class ProjectAnalyzer:
 
                 for filename in filenames:
                     try:
-                        result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
-                        callgraph_fragments.append(callgraph_fragment)
+                        inspected = self.inspector.inspect(filename, include_callgraph=enable_callgraph)
+
+                        if enable_callgraph:
+                            if isinstance(inspected, tuple) and len(inspected) == 2:
+                                result, callgraph_fragment = inspected
+                                callgraph_fragments.append(callgraph_fragment)
+                            else:
+                                result = inspected
+                        else:
+                            result = inspected[0] if isinstance(inspected, tuple) else inspected
 
                         smell_count = len(result)
                         project_smells += smell_count
@@ -304,22 +442,32 @@ class ProjectAnalyzer:
                 os.makedirs(details_path, exist_ok=True)
 
                 if not to_save.empty:
-                    detailed_file_path = os.path.join(
-                        details_path, f"{dirname}_results.csv"
-                    )
-                    to_save.to_csv(detailed_file_path, index=False)
+                    base_name = f"{dirname}_results.csv"
+                    base, _ = os.path.splitext(base_name)
+                    if report_format == "json":
+                        detailed_file_path = os.path.join(details_path, f"{base}.json")
+                        to_save.to_json(detailed_file_path, orient="records", indent=2)
+                    else:
+                        detailed_file_path = os.path.join(details_path, f"{base}.csv")
+                        to_save.to_csv(detailed_file_path, index=False)
+
                     print(f"Detailed results saved to {detailed_file_path}")
 
-                builder = CallGraphBuilder()
-                callgraph = builder.build(callgraph_fragments, project_root=project_path)
+                if enable_callgraph:
+                    builder = CallGraphBuilder()
+                    callgraph = builder.build(callgraph_fragments, project_root=project_path)
 
-                cg_path = os.path.join(details_path, f"{dirname}_callgraph.json")
-                builder.save(callgraph, cg_path)
-                print(f"Call graph saved to {cg_path}")
+                    cg_path = self._resolve_callgraph_output_path(
+                        project_path=project_path,
+                        project_name=dirname,
+                        callgraph_output=callgraph_output,
+                        multiple=True,
+                    )
+                    builder.save(callgraph, cg_path)
+                    print(f"Call graph saved to {cg_path}")
 
                 total_smells += project_smells
 
-                # Thread-safe log update
                 FileUtils.synchronized_append_to_log(
                     execution_log_path, dirname, lock
                 )
@@ -337,12 +485,12 @@ class ProjectAnalyzer:
         )
         print(f"Total code smells found in all projects: {total_smells}\n")
 
-    def merge_all_results(self):
+    def merge_all_results(self, report_format: str = "csv"):
         """
-        Merges all CSV result files from multiple
-        projects into a single overview CSV in the root output folder.
+        Merges all result files from multiple projects into a single overview report.
         """
         FileUtils.merge_results(
             input_dir=os.path.join(self.output_path, "project_details"),
             output_dir=self.output_path,
+            report_format=report_format,
         )
