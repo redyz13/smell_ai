@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 import os
 import pandas as pd
 from components.project_analyzer import ProjectAnalyzer
@@ -22,7 +22,8 @@ def test_project_analyzer_calls_inspect(
     mock_inspector_class, project_analyzer_setup
 ):
     mock_instance = Mock()
-    mock_instance.inspect.return_value = pd.DataFrame(
+
+    mock_df = pd.DataFrame(
         [
             {
                 "filename": "test_file1.py",
@@ -34,6 +35,10 @@ def test_project_analyzer_calls_inspect(
             }
         ]
     )
+
+    mock_fragment = {"file": "test_file1.py", "nodes": [], "edges": []}
+
+    mock_instance.inspect.return_value = (mock_df, mock_fragment)
     mock_inspector_class.return_value = mock_instance
 
     input_path, output_path = project_analyzer_setup
@@ -43,8 +48,14 @@ def test_project_analyzer_calls_inspect(
     total_smells = analyzer.analyze_project(input_path)
 
     expected_calls = [
-        ((str(os.path.join(input_path, "test_file1.py")),),),
-        ((str(os.path.join(input_path, "test_file2.py")),),),
+        call(
+            str(os.path.join(input_path, "test_file1.py")),
+            include_callgraph=True,
+        ),
+        call(
+            str(os.path.join(input_path, "test_file2.py")),
+            include_callgraph=True,
+        ),
     ]
     mock_instance.inspect.assert_has_calls(expected_calls, any_order=True)
 
