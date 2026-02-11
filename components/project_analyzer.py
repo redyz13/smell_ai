@@ -5,6 +5,7 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from components.inspector import Inspector
 from utils.file_utils import FileUtils
+from call_graph.call_graph_builder import CallGraphBuilder
 
 
 class ProjectAnalyzer:
@@ -75,9 +76,12 @@ class ProjectAnalyzer:
         to_save = pd.DataFrame(columns=col)
         total_smells = 0
 
+        callgraph_fragments = []
+
         for filename in filenames:
             try:
-                result = self.inspector.inspect(filename)
+                result, callgraph_fragment = self.inspector.inspect(filename)
+                callgraph_fragments.append(callgraph_fragment)
 
                 smell_count = len(result)
                 total_smells += smell_count
@@ -95,6 +99,14 @@ class ProjectAnalyzer:
                 continue
 
         self._save_results(to_save, "overview.csv")
+
+        builder = CallGraphBuilder()
+        callgraph = builder.build(callgraph_fragments, project_root=project_path)
+
+        os.makedirs(self.output_path, exist_ok=True)
+        cg_path = os.path.join(self.output_path, "callgraph.json")
+        builder.save(callgraph, cg_path)
+        print(f"Call graph saved to {cg_path}")
 
         print(f"Finished analysis for project: {project_name}")
         print(
@@ -155,10 +167,12 @@ class ProjectAnalyzer:
                 ]
                 to_save = pd.DataFrame(columns=col)
                 project_smells = 0
+                callgraph_fragments = []
 
                 for filename in filenames:
                     try:
-                        result = self.inspector.inspect(filename)
+                        result, callgraph_fragment = self.inspector.inspect(filename)
+                        callgraph_fragments.append(callgraph_fragment)
 
                         smell_count = len(result)
                         project_smells += smell_count
@@ -180,16 +194,24 @@ class ProjectAnalyzer:
                         print(f"Error analyzing file: {filename} - {str(e)}")
                         continue
 
+                details_path = os.path.join(
+                    self.output_path, "project_details"
+                )
+                os.makedirs(details_path, exist_ok=True)
+
                 if not to_save.empty:
-                    details_path = os.path.join(
-                        self.output_path, "project_details"
-                    )
-                    os.makedirs(details_path, exist_ok=True)
                     detailed_file_path = os.path.join(
                         details_path, f"{dirname}_results.csv"
                     )
                     to_save.to_csv(detailed_file_path, index=False)
                     print(f"Detailed results saved to {detailed_file_path}")
+
+                builder = CallGraphBuilder()
+                callgraph = builder.build(callgraph_fragments, project_root=project_path)
+
+                cg_path = os.path.join(details_path, f"{dirname}_callgraph.json")
+                builder.save(callgraph, cg_path)
+                print(f"Call graph saved to {cg_path}")
 
                 total_smells += project_smells
                 print(
@@ -249,10 +271,12 @@ class ProjectAnalyzer:
                 ]
                 to_save = pd.DataFrame(columns=col)
                 project_smells = 0
+                callgraph_fragments = []
 
                 for filename in filenames:
                     try:
-                        result = self.inspector.inspect(filename)
+                        result, callgraph_fragment = self.inspector.inspect(filename)
+                        callgraph_fragments.append(callgraph_fragment)
 
                         smell_count = len(result)
                         project_smells += smell_count
@@ -274,16 +298,24 @@ class ProjectAnalyzer:
                         print(f"Error analyzing file: {filename} - {str(e)}")
                         continue
 
+                details_path = os.path.join(
+                    self.output_path, "project_details"
+                )
+                os.makedirs(details_path, exist_ok=True)
+
                 if not to_save.empty:
-                    details_path = os.path.join(
-                        self.output_path, "project_details"
-                    )
-                    os.makedirs(details_path, exist_ok=True)
                     detailed_file_path = os.path.join(
                         details_path, f"{dirname}_results.csv"
                     )
                     to_save.to_csv(detailed_file_path, index=False)
                     print(f"Detailed results saved to {detailed_file_path}")
+
+                builder = CallGraphBuilder()
+                callgraph = builder.build(callgraph_fragments, project_root=project_path)
+
+                cg_path = os.path.join(details_path, f"{dirname}_callgraph.json")
+                builder.save(callgraph, cg_path)
+                print(f"Call graph saved to {cg_path}")
 
                 total_smells += project_smells
 
