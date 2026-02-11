@@ -59,7 +59,7 @@ def test_analyze_project(
 
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: df.to_csv(
+        lambda self, df, path, report_format="csv": df.to_csv(
             output_dir / "overview.csv", index=False
         ),
     )
@@ -104,7 +104,8 @@ def test_analyze_project(
 
     # Run the method
     total_smells = project_analyzer.analyze_project(
-        "test/unit_testing/components/mock_project_path"
+        "test/unit_testing/components/mock_project_path",
+        enable_callgraph=True,
     )
 
     # Assertions
@@ -135,7 +136,7 @@ def test_analyze_projects_sequential(
 
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: df.to_csv(
+        lambda self, df, path, report_format="csv": df.to_csv(
             output_dir / "overview.csv", index=False
         ),
     )
@@ -150,12 +151,17 @@ def test_analyze_projects_sequential(
         }
     )
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
+        return_value=(
+            mock_inspection_results,
+            {"file": "file1.py", "nodes": [], "edges": []},
+        )
     )
 
     # Call the method
     project_analyzer.analyze_projects_sequential(
-        "test/unit_testing/components/mock_project_path", resume=False
+        "test/unit_testing/components/mock_project_path",
+        resume=False,
+        enable_callgraph=True,
     )
 
     # Ensure inspect was called
@@ -200,10 +206,9 @@ def test_merge_all_results(monkeypatch, project_analyzer):
 
     # Assertions
     mock_merge_results.assert_called_once_with(
-        input_dir=os.path.join(
-            project_analyzer.output_path, "project_details"
-        ),
+        input_dir=os.path.join(project_analyzer.output_path, "project_details"),
         output_dir=project_analyzer.output_path,
+        report_format="csv",
     )
 
 
@@ -226,23 +231,21 @@ def test_analyze_projects_parallel(
     )
 
     # Mock dependencies
-    monkeypatch.setattr(
-        "os.path.exists", lambda path: True  # Mock that all paths exist
-    )
-    monkeypatch.setattr(
-        "os.path.isdir",
-        lambda path: True,  # Mock that all paths are directories
-    )
+    monkeypatch.setattr("os.path.exists", lambda path: True)
+    monkeypatch.setattr("os.path.isdir", lambda path: True)
 
     # Mock the inspector's inspect method
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
+        return_value=(
+            mock_inspection_results,
+            {"file": "file1.py", "nodes": [], "edges": []},
+        )
     )
 
     # Mock save results method
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: None,  # Do nothing on saving results
+        lambda self, df, path, report_format="csv": None,
     )
 
     # Mock ThreadPoolExecutor to avoid threading and run tasks synchronously
@@ -250,7 +253,6 @@ def test_analyze_projects_parallel(
         mock_executor = MagicMock()
         MockExecutor.return_value = mock_executor
         mock_executor.__enter__.return_value = mock_executor
-        # Make sure the function gets executed immediately (synchronously)
         mock_executor.submit.side_effect = lambda func, *args, **kwargs: func(
             *args, **kwargs
         )
@@ -261,11 +263,8 @@ def test_analyze_projects_parallel(
                 "test/unit_testing/components/mock_base_path", max_workers=1
             )
 
-        # Ensure the inspector's inspect method
-        # was called the expected number of times
+        # Ensure the inspector's inspect method was called the expected number of times
         assert project_analyzer.inspector.inspect.call_count == 2
-
-        # Check if print statements were made (optional)
         assert mock_print.call_count > 0
 
 
@@ -312,7 +311,7 @@ def test_analyze_project_with_errors(
 
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: df.to_csv(
+        lambda self, df, path, report_format="csv": df.to_csv(
             output_dir / "overview.csv", index=False
         ),
     )
@@ -330,9 +329,7 @@ def test_analyze_project_with_errors(
     with open(error_file, "r") as f:
         error_content = f.read()
 
-    assert (
-        "Error in file file1.py: " in error_content
-    )  # Check that error is logged
+    assert "Error in file file1.py: " in error_content
 
     mock_project_path = "test/unit_testing/components/mock_project_path"
     if os.path.exists(mock_project_path):
@@ -353,7 +350,7 @@ def test_analyze_projects_sequential_save_results(
 
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: df.to_csv(
+        lambda self, df, path, report_format="csv": df.to_csv(
             output_dir / "overview.csv", index=False
         ),
     )
@@ -368,12 +365,17 @@ def test_analyze_projects_sequential_save_results(
         }
     )
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
+        return_value=(
+            mock_inspection_results,
+            {"file": "file1.py", "nodes": [], "edges": []},
+        )
     )
 
     # Call the method
     project_analyzer.analyze_projects_sequential(
-        "test/unit_testing/components/mock_project_path", resume=False
+        "test/unit_testing/components/mock_project_path",
+        resume=False,
+        enable_callgraph=True,
     )
 
     # Check if project_details directory and the result file were created
@@ -414,7 +416,10 @@ def test_analyze_projects_parallel_thread_safety(
 
     # Mock the inspector's inspect method
     project_analyzer.inspector.inspect = MagicMock(
-        return_value=(mock_inspection_results, {"file": "file1.py", "nodes": [], "edges": []})
+        return_value=(
+            mock_inspection_results,
+            {"file": "file1.py", "nodes": [], "edges": []},
+        )
     )
 
     # Mock the synchronized_append_to_log method to check for thread-safety
@@ -429,13 +434,10 @@ def test_analyze_projects_parallel_thread_safety(
         "test/unit_testing/components/mock_base_path", max_workers=2
     )
 
-    # Normalize the paths for cross-platform consistency
     expected_path = os.path.join(
         "test/unit_testing/components/mock_base_path", "execution_log.txt"
     )
 
-    # Ensure the synchronized_append_to_log
-    # method was called with both project1 and project2
     mock_synchronized_append.assert_any_call(expected_path, "project1", ANY)
     mock_synchronized_append.assert_any_call(expected_path, "project2", ANY)
 
@@ -458,7 +460,7 @@ def test_analyze_project_empty_directory(
 
     monkeypatch.setattr(
         "components.project_analyzer.ProjectAnalyzer._save_results",
-        lambda self, df, path: df.to_csv(
+        lambda self, df, path, report_format="csv": df.to_csv(
             output_dir / "overview.csv", index=False
         ),
     )
@@ -471,7 +473,8 @@ def test_analyze_project_empty_directory(
     project_path = "test/unit_testing/components/mock_project_path"
 
     with pytest.raises(ValueError) as excinfo:
-        # Run the method
         project_analyzer.analyze_project(project_path)
 
-    assert f"The project '{project_path}' contains no Python files." == str(excinfo.value)
+    assert f"The project '{project_path}' contains no Python files." == str(
+        excinfo.value
+    )

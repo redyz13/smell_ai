@@ -1,5 +1,4 @@
 import json
-import os
 from components.project_analyzer import ProjectAnalyzer
 
 
@@ -23,7 +22,8 @@ def test_pipeline_generates_callgraph_json(tmp_path):
     )
 
     analyzer = ProjectAnalyzer(str(out_dir))
-    analyzer.analyze_project(str(project_dir))
+    # Enable callgraph so callgraph.json is generated
+    analyzer.analyze_project(str(project_dir), enable_callgraph=True)
 
     cg_path = out_dir / "output" / "callgraph.json"
     assert cg_path.exists()
@@ -36,4 +36,3 @@ def test_pipeline_generates_callgraph_json(tmp_path):
 
     edges = {(e["source"], e["target"]) for e in cg["edges"]}
     assert ("a.py:foo", "b.py:bar") in edges
-

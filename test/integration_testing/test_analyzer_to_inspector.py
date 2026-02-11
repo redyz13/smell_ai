@@ -45,7 +45,8 @@ def test_project_analyzer_calls_inspect(
 
     analyzer = ProjectAnalyzer(output_path=output_path)
 
-    total_smells = analyzer.analyze_project(input_path)
+    # Enable callgraph so Inspector.inspect is called with include_callgraph=True
+    total_smells = analyzer.analyze_project(input_path, enable_callgraph=True)
 
     expected_calls = [
         call(

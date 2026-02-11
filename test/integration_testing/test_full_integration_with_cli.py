@@ -49,6 +49,10 @@ def test_full_integration_with_cli(mock_rule_check, integration_setup):
         parallel=False,
         resume=False,
         multiple=False,
+        enable_callgraph=False,
+        callgraph_output=None,
+        exclude_paths=[],
+        format="csv",
     )
 
     cli = CodeSmileCLI(args)
