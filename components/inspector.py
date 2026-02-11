@@ -6,6 +6,7 @@ from code_extractor.model_extractor import ModelExtractor
 from code_extractor.dataframe_extractor import DataFrameExtractor
 from code_extractor.variable_extractor import VariableExtractor
 from components.rule_checker import RuleChecker
+from call_graph.call_graph_extractor import CallGraphExtractor
 
 
 class Inspector:
@@ -34,7 +35,7 @@ class Inspector:
         self.output_path = output_path
         self._setup(dataframe_dict_path, model_dict_path, tensor_dict_path)
 
-    def inspect(self, filename: str) -> pd.DataFrame:
+    def inspect(self, filename: str):
         """
         Inspects a file for code smells by parsing it into an AST and applying
         rules.
@@ -44,6 +45,7 @@ class Inspector:
 
         Returns:
         - pd.DataFrame: A DataFrame containing detected code smells.
+        - dict: A call graph fragment for the analyzed file.
         """
         col = [
             "filename",
@@ -63,6 +65,9 @@ class Inspector:
             # Parse the file into an AST
             tree = ast.parse(source)
             lines = source.splitlines()
+
+            # Extract call graph fragment (per-file)
+            callgraph_fragment = self.callgraph_extractor.extract(tree, filename)
 
             # Step 1: Extract Libraries
             libraries = self.library_extractor.get_library_aliases(
@@ -139,7 +144,7 @@ class Inspector:
             print(f"Unexpected error while analyzing file '{filename}': {e}")
             raise e
 
-        return to_save
+        return to_save, callgraph_fragment
 
     def _setup(
         self,
@@ -167,6 +172,8 @@ class Inspector:
         self.dataframe_extractor = DataFrameExtractor(
             df_dict_path=dataframe_dict_path,
         )
+
+        self.callgraph_extractor = CallGraphExtractor()
 
         # Preload dictionaries to avoid runtime errors
         self.model_extractor.load_model_dict()
