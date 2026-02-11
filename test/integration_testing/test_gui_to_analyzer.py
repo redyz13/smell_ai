@@ -6,8 +6,10 @@ from gui.code_smell_detector_gui import CodeSmellDetectorGUI
 
 @pytest.fixture
 def gui_setup():
-    root = Tk()
-    gui = CodeSmellDetectorGUI(root)
+    gui = CodeSmellDetectorGUI.__new__(CodeSmellDetectorGUI)
+    gui.root = Mock()
+    gui.input_path = Mock()
+    gui.output_path = Mock()
     return gui
 
 
