@@ -80,7 +80,7 @@ class ProjectAnalyzer:
 
         for filename in filenames:
             try:
-                result, callgraph_fragment = self.inspector.inspect(filename)
+                result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
                 callgraph_fragments.append(callgraph_fragment)
 
                 smell_count = len(result)
@@ -171,7 +171,7 @@ class ProjectAnalyzer:
 
                 for filename in filenames:
                     try:
-                        result, callgraph_fragment = self.inspector.inspect(filename)
+                        result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
                         callgraph_fragments.append(callgraph_fragment)
 
                         smell_count = len(result)
@@ -275,7 +275,7 @@ class ProjectAnalyzer:
 
                 for filename in filenames:
                     try:
-                        result, callgraph_fragment = self.inspector.inspect(filename)
+                        result, callgraph_fragment = self.inspector.inspect(filename, include_callgraph=True)
                         callgraph_fragments.append(callgraph_fragment)
 
                         smell_count = len(result)

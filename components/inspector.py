@@ -35,17 +35,18 @@ class Inspector:
         self.output_path = output_path
         self._setup(dataframe_dict_path, model_dict_path, tensor_dict_path)
 
-    def inspect(self, filename: str):
+    def inspect(self, filename: str, include_callgraph: bool = False):
         """
         Inspects a file for code smells by parsing it into an AST and applying
         rules.
 
         Parameters:
         - filename (str): The name of the file to analyze.
+        - include_callgraph (bool): Whether to return a call graph fragment.
 
         Returns:
         - pd.DataFrame: A DataFrame containing detected code smells.
-        - dict: A call graph fragment for the analyzed file.
+        - dict (optional): A call graph fragment for the analyzed file.
         """
         col = [
             "filename",
@@ -58,6 +59,8 @@ class Inspector:
         to_save = pd.DataFrame(columns=col)
         file_path = os.path.abspath(filename)
 
+        callgraph_fragment = None
+
         try:
             with open(file_path, "r", encoding="utf-8") as file:
                 source = file.read()
@@ -66,8 +69,8 @@ class Inspector:
             tree = ast.parse(source)
             lines = source.splitlines()
 
-            # Extract call graph fragment (per-file)
-            callgraph_fragment = self.callgraph_extractor.extract(tree, filename)
+            if include_callgraph:
+                callgraph_fragment = self.callgraph_extractor.extract(tree, filename)
 
             # Step 1: Extract Libraries
             libraries = self.library_extractor.get_library_aliases(
@@ -144,7 +147,10 @@ class Inspector:
             print(f"Unexpected error while analyzing file '{filename}': {e}")
             raise e
 
-        return to_save, callgraph_fragment
+        if include_callgraph:
+            return to_save, callgraph_fragment
+
+        return to_save
 
     def _setup(
         self,
