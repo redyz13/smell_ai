@@ -18,6 +18,16 @@ services:
       - STATIC_ANALYSIS_SERVICE=http://static_analysis_service:8002
       - REPORT_SERVICE=http://report_service:8003
 
+  # Ollama (LLM runtime)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    networks:
+      - code_smile_network
+    volumes:
+      - ollama_data:/root/.ollama
+
   # AI Analysis Service
   ai_analysis_service:
     build:
@@ -26,6 +36,11 @@ services:
       - "8001:8001"
     networks:
       - code_smile_network
+    environment:
+      - OLLAMA_API_URL=http://ollama:11434/api/generate
+      - OLLAMA_MODEL_NAME=codesmile:latest
+    depends_on:
+      - ollama
 
   # Static Analysis Service
   static_analysis_service:
@@ -40,6 +55,10 @@ services:
       - ./code_extractor:/app/code_extractor
       - ./detection_rules:/app/detection_rules
       - ./obj_dictionaries:/app/obj_dictionaries
+      - ./call_graph:/app/call_graph
+      - ./output/staticanalysis:/app/output
+    environment:
+      - OUTPUT_DIR=/app/output
 
   # Report Service
   report_service:
@@ -67,3 +86,6 @@ services:
 networks:
   code_smile_network:
     driver: bridge
+
+volumes:
+  ollama_data:
