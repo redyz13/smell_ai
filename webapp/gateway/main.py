@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+import os
 
 app = FastAPI()
 
@@ -13,15 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Service URLs for testing/local deployment
-AI_ANALYSIS_SERVICE = "http://localhost:8001"
-STATIC_ANALYSIS_SERVICE = "http://localhost:8002"
-REPORT_SERVICE = "http://localhost:8003"
-
-# Service URLs for docker deployement
-""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001"
-STATIC_ANALYSIS_SERVICE = "http://static_analysis_service:8002"
-REPORT_SERVICE = "http://report_service:8003" """
+# Service URLs (uniform: local defaults, docker via env vars)
+AI_ANALYSIS_SERVICE = os.getenv("AI_ANALYSIS_SERVICE", "http://localhost:8001")
+STATIC_ANALYSIS_SERVICE = os.getenv("STATIC_ANALYSIS_SERVICE", "http://localhost:8002")
+REPORT_SERVICE = os.getenv("REPORT_SERVICE", "http://localhost:8003")
 
 
 @app.get("/")
@@ -46,8 +42,7 @@ async def detect_smell_ai(request: dict):
             "error": f"Request to AI Analysis Service failed: {str(exc)}",
         }
     except httpx.TimeoutException:
-        return {"success": False,
-                "error": "Request to AI Analysis Service timed out"}
+        return {"success": False, "error": "Request to AI Analysis Service timed out"}
 
 
 # Proxy requests to Static Analysis Service
@@ -64,6 +59,5 @@ async def detect_smell_static(request: dict):
 @app.post("/api/generate_report")
 async def generate_report(request: dict):
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{REPORT_SERVICE}/generate_report", json=request)
+        response = await client.post(f"{REPORT_SERVICE}/generate_report", json=request)
     return response.json()
