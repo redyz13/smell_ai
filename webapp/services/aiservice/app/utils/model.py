@@ -3,10 +3,14 @@ import time
 import requests
 import logging
 import re
-# When running locally
-from webapp.services.aiservice.app.schemas.responses import Smell
-# When running with Docker
-"""from app.schemas.responses import Smell"""
+import os
+from typing import Optional
+
+# Import robusto: locale + docker
+try:
+    from webapp.services.aiservice.app.schemas.responses import Smell
+except ModuleNotFoundError:
+    from app.schemas.responses import Smell
 
 
 class Model:
@@ -16,17 +20,25 @@ class Model:
 
     def __init__(
         self,
-        api_url: str = "http://localhost:11434/api/generate",
-        model_name: str = "codesmile:latest",
+        api_url: Optional[str] = None,
+        model_name: Optional[str] = None,
     ):
         """
         Initialize the Model instance.
 
-        :param api_url: The URL of the Ollama API endpoint.
-        :param model_name: The name of the Ollama model to be used.
+        api_url/model_name can be provided explicitly, otherwise read from env:
+          - OLLAMA_API_URL
+          - OLLAMA_MODEL_NAME
+        How to provide:
+            :param api_url: The URL of the Ollama API endpoint.
+            :param model_name: The name of the Ollama model to be used.
         """
-        self.api_url = api_url
-        self.model_name = model_name
+        self.api_url = api_url or os.getenv(
+            "OLLAMA_API_URL", "http://localhost:11434/api/generate"
+        )
+        self.model_name = model_name or os.getenv(
+            "OLLAMA_MODEL_NAME", "codesmile:latest"
+        )
         self.logger = logging.getLogger("Model")
         logging.basicConfig(level=logging.INFO)
 
@@ -38,19 +50,20 @@ class Model:
         :return: A dictionary containing the analysis results.
         """
         start_time = time.time()
+        response = None
         try:
             prompt = (
-                f"You are an assistant trained to detect "
-                "code smells in Python code.\n\n"
+                "You are an assistant trained to detect code smells in Python code.\n\n"
                 f"Here is the code:\n{code_snippet}\n\n"
-                f"Identify the code smell in the above code."
+                "Identify the code smell in the above code."
             )
             payload = {"model": self.model_name, "prompt": prompt}
+
             response = requests.post(
                 self.api_url,
                 json=payload,
                 timeout=60,
-                stream=True
+                stream=True,
             )
 
             if response.status_code != 200:
@@ -58,8 +71,7 @@ class Model:
                     "Ollama API responded with status code "
                     f"{response.status_code}: {response.text}"
                 )
-                return {"success": False,
-                        "label": "Error in AI model analysis"}
+                return {"success": False, "label": "Error in AI model analysis"}
 
             if not response.content:
                 self.logger.error("Ollama API returned an empty response.")
@@ -68,21 +80,19 @@ class Model:
             # Initialize to reconstruct the response
             complete_response = ""
             for line in response.iter_lines(decode_unicode=True):
-                if line:  # Process each line of streamed response
-                    try:
-                        chunk = json.loads(line)
-                        if "response" in chunk:
-                            complete_response += chunk["response"]
-                    except json.JSONDecodeError as e:
-                        self.logger.error(
-                            f"Error decoding JSON chunk: {line} | {e}")
+                if not line:
+                    continue
+                try:
+                    chunk = json.loads(line)
+                    if "response" in chunk:
+                        complete_response += chunk["response"]
+                except json.JSONDecodeError as e:
+                    self.logger.error("Error decoding JSON chunk: %s | %s", line, e)
 
             # Log and validate the reassembled response
             if not complete_response:
-                self.logger.warning(
-                    "No valid response content reassembled from stream.")
-                return {"success": False,
-                        "label": "Incomplete response from AI model"}
+                self.logger.warning("No valid response content reassembled from stream.")
+                return {"success": False, "label": "Incomplete response from AI model"}
 
             # Parse the final response for the code smell
             smells = self.parse_smell(complete_response)
@@ -90,6 +100,7 @@ class Model:
 
         except requests.exceptions.Timeout:
             self.logger.error("Request timed out.")
+            return {"success": False, "label": "Ollama request timed out"}
 
         except ValueError:
             self.logger.error(f"Invalid JSON response: {response.text}")
@@ -145,14 +156,13 @@ class Model:
             re.DOTALL
         )
         if not match:
-            logging.warning(
-                "No 'The code smells are:' section found in response.")
+            logging.warning("No 'The code smells are:' section found in response.")
             return []
 
         # Extract all lines starting with "- "
         raw_labels = re.findall(r"- (.+)", match.group(1))
 
-        smells = []
+        smells: list[Smell] = []
         for label in raw_labels:
             # Clean the label and validate against known smells
             label = label.split(":")[0].strip()
