@@ -1,37 +1,54 @@
 import os
 import tempfile
 import pandas as pd
+
+try:
+    from webapp.services.staticanalysis.app.schemas.responses import Smell
+except ModuleNotFoundError:
+    from app.schemas.responses import Smell
+
 from components.inspector import Inspector
-from components.call_graph_builder import CallGraphBuilder
+
+# Output dir configurabile (local default) + creazione directory
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "output")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+inspector = Inspector(output_path=OUTPUT_DIR)
+
 
 def detect_static(code_snippet: str) -> dict:
     temp_file_path = None
     try:
-        # Creazione file con codifica UTF-8 per evitare errori di decodifica
-        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w", encoding="utf-8") as temp_file:
+        # Create a temporary file to analyze the code snippet
+        with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as temp_file:
             temp_file.write(code_snippet)
             temp_file_path = temp_file.name
 
-        # 1. Analisi Smell (Rossi)
-        inspector = Inspector(output_path="output")
-        smells_df = inspector.inspect(temp_file_path)
-        smells = smells_df.to_dict('records') if not smells_df.empty else []
+        smells_df: pd.DataFrame = inspector.inspect(temp_file_path)
 
-        # 2. Estrazione Grafo Completo (Tutti i nodi, anche i verdi)
-        builder = CallGraphBuilder()
-        builder.analyze_file(temp_file_path)
-        graph_data = builder.get_graph_data()
+        # Handle cases with no results
+        if smells_df.empty:
+            return {"success": True, "response": "Static analysis returned no data"}
 
-        # Restituiamo tutto nella chiave "response" per non rompere il Gateway
-        return {
-            "success": True,
-            "response": {
-                "smells": smells,
-                "callgraph": graph_data
-            }
-        }
+        smells = [
+            Smell(
+                function_name=row["function_name"],
+                line=row["line"],
+                smell_name=row["smell_name"],
+                description=row["description"],
+                additional_info=row["additional_info"],
+            )
+            for _, row in smells_df.iterrows()
+        ]
+
+        return {"success": True, "response": smells}
+
     except Exception as e:
         return {"success": False, "response": str(e)}
+
     finally:
         if temp_file_path and os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+            try:
+                os.remove(temp_file_path)
+            except OSError:
+                pass
