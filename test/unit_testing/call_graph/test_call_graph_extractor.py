@@ -15,6 +15,7 @@ def foo():
     frag = ex.extract(tree, "a.py")
 
     node_ids = {n["id"] for n in frag["nodes"]}
+    assert "a.py::<module>" in node_ids
     assert "a.py::foo" in node_ids
     assert "a.py::bar" in node_ids
 
@@ -36,6 +37,7 @@ class C:
     frag = ex.extract(tree, "a.py")
 
     node_ids = {n["id"] for n in frag["nodes"]}
+    assert "a.py::<module>" in node_ids
     assert "a.py::C.m" in node_ids
     assert "a.py::C.n" in node_ids
 
@@ -52,5 +54,36 @@ def foo():
     ex = CallGraphExtractor()
     frag = ex.extract(tree, "a.py")
 
+    node_ids = {n["id"] for n in frag["nodes"]}
+    assert "a.py::<module>" in node_ids
+
     edges = frag["edges"]
-    assert any(e["source"] == "a.py::foo" and e["target"] == "unresolved:print" for e in edges)
+    assert any(
+        e["source"] == "a.py::foo" and e["target"] == "unresolved:print"
+        for e in edges
+    )
+
+
+def test_extractor_does_not_assign_nested_calls_to_module():
+    code = """
+print("top")
+
+def foo():
+    print("in foo")
+    bar()
+
+def bar():
+    print("in bar")
+"""
+    tree = ast.parse(code)
+    ex = CallGraphExtractor()
+    frag = ex.extract(tree, "a.py")
+
+    edges = {(e["source"], e["target"]) for e in frag["edges"]}
+
+    assert ("a.py::<module>", "unresolved:print") in edges
+    assert ("a.py::foo", "unresolved:print") in edges
+    assert ("a.py::foo", "a.py::bar") in edges
+    assert ("a.py::bar", "unresolved:print") in edges
+
+    assert ("a.py::<module>", "a.py::bar") not in edges
