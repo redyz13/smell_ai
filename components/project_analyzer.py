@@ -3,6 +3,7 @@ import time
 import threading
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
 from components.inspector import Inspector
 from utils.file_utils import FileUtils
 from call_graph.call_graph_builder import CallGraphBuilder
@@ -53,6 +54,47 @@ class ProjectAnalyzer:
             df.to_csv(file_path, index=False)
 
         print(f"Results saved to {file_path}")
+
+    def _build_smells_by_node_id(
+        self, df: pd.DataFrame, project_root: str
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Build a mapping compatible with CallGraphBuilder node ids:
+          <file_rel>:<function_name>
+        where file_rel is relative to project_root (same normalization used in call graph).
+        """
+        smells_by_node_id: Dict[str, List[Dict[str, Any]]] = {}
+        if df is None or df.empty:
+            return smells_by_node_id
+
+        root_abs = os.path.abspath(project_root)
+
+        def relativize(file_path: str) -> str:
+            try:
+                abs_file = os.path.abspath(file_path)
+                rel = os.path.relpath(abs_file, root_abs)
+                return rel.replace("\\", "/")
+            except Exception:
+                return str(file_path).replace("\\", "/")
+
+        for _, row in df.iterrows():
+            filename = str(row.get("filename", "")).strip()
+            function_name = str(row.get("function_name", "")).strip()
+            if not filename or not function_name:
+                continue
+
+            file_rel = relativize(filename)
+            node_id = f"{file_rel}:{function_name}"
+
+            smell_obj = {
+                "smell_name": row.get("smell_name"),
+                "line": int(row.get("line")) if pd.notna(row.get("line")) else -1,
+                "description": row.get("description"),
+                "additional_info": row.get("additional_info"),
+            }
+            smells_by_node_id.setdefault(node_id, []).append(smell_obj)
+
+        return smells_by_node_id
 
     def _normalize_exclude_paths(self, exclude_paths, base_path: str):
         if not exclude_paths:
@@ -192,7 +234,12 @@ class ProjectAnalyzer:
 
         if enable_callgraph:
             builder = CallGraphBuilder()
-            callgraph = builder.build(callgraph_fragments, project_root=project_path)
+            smells_map = self._build_smells_by_node_id(to_save, project_path)
+            callgraph = builder.build(
+                callgraph_fragments,
+                project_root=project_path,
+                smells_by_node_id=smells_map,
+            )
 
             cg_path = self._resolve_callgraph_output_path(
                 project_path=project_path,
@@ -323,7 +370,12 @@ class ProjectAnalyzer:
 
                 if enable_callgraph:
                     builder = CallGraphBuilder()
-                    callgraph = builder.build(callgraph_fragments, project_root=project_path)
+                    smells_map = self._build_smells_by_node_id(to_save, project_path)
+                    callgraph = builder.build(
+                        callgraph_fragments,
+                        project_root=project_path,
+                        smells_by_node_id=smells_map,
+                    )
 
                     cg_path = self._resolve_callgraph_output_path(
                         project_path=project_path,
@@ -376,7 +428,7 @@ class ProjectAnalyzer:
 
         start_time = time.time()
         total_smells = 0
-        lock = threading.Lock()  # Thread-safe lock for logging
+        lock = threading.Lock()
 
         def analyze_and_count_smells(dirname: str):
             nonlocal total_smells
@@ -455,7 +507,12 @@ class ProjectAnalyzer:
 
                 if enable_callgraph:
                     builder = CallGraphBuilder()
-                    callgraph = builder.build(callgraph_fragments, project_root=project_path)
+                    smells_map = self._build_smells_by_node_id(to_save, project_path)
+                    callgraph = builder.build(
+                        callgraph_fragments,
+                        project_root=project_path,
+                        smells_by_node_id=smells_map,
+                    )
 
                     cg_path = self._resolve_callgraph_output_path(
                         project_path=project_path,
