@@ -10,7 +10,12 @@ class CallGraphBuilder:
 
     _DELIM = "::"
 
-    def build(self, fragments: List[Dict[str, Any]], project_root: Optional[str] = None) -> Dict[str, Any]:
+    def build(
+        self,
+        fragments: List[Dict[str, Any]],
+        project_root: Optional[str] = None,
+        smells_by_node_id: Optional[Dict[str, List[Any]]] = None,
+    ) -> Dict[str, Any]:
         nodes: Dict[str, Dict[str, Any]] = {}
         edges: List[Dict[str, Any]] = []
 
@@ -23,12 +28,19 @@ class CallGraphBuilder:
                 qualname = self._extract_qualname(n.get("id", ""))
                 node_id = f"{file_rel}:{qualname}"
 
+                smells: List[Any] = []
+                if smells_by_node_id is not None:
+                    smells = smells_by_node_id.get(node_id, []) or []
+
                 nodes[node_id] = {
                     "id": node_id,
                     "label": n.get("label", qualname),
                     "file": file_rel,
                     "line": n.get("line", -1),
                     "type": n.get("type", "function"),
+                    "smells": smells,
+                    "is_smelly": bool(smells),
+                    "calls_smelly": False,
                 }
 
         # Index by short name to resolve unresolved plain calls
@@ -59,6 +71,15 @@ class CallGraphBuilder:
                         "line": e.get("line", -1),
                     }
                 )
+
+        # Third pass: mark nodes that call at least one smelly node
+        for e in edges:
+            tgt = e.get("target")
+            src = e.get("source")
+            if isinstance(tgt, str) and isinstance(src, str):
+                if tgt in nodes and nodes[tgt].get("is_smelly"):
+                    if src in nodes:
+                        nodes[src]["calls_smelly"] = True
 
         return {
             "version": "1.0",
