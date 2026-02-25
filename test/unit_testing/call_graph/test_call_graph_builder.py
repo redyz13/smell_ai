@@ -1,5 +1,4 @@
 import json
-import os
 from call_graph.call_graph_builder import CallGraphBuilder
 
 
@@ -37,10 +36,17 @@ def test_builder_normalizes_ids_and_files_to_be_portable(tmp_path):
     assert "a.py:foo" in node_ids
     assert "b.py:bar" in node_ids
 
-    for nid in node_ids:
-        assert "::" not in nid
-        assert ":\\" not in nid
-        assert nid.count(":") >= 1
+    for n in cg["nodes"]:
+        assert "::" not in n["id"]
+        assert ":\\" not in n["id"]
+        assert n["id"].count(":") >= 1
+
+        assert "smells" in n
+        assert "is_smelly" in n
+        assert "calls_smelly" in n
+        assert n["smells"] == []
+        assert n["is_smelly"] is False
+        assert n["calls_smelly"] is False
 
     files = {n["file"] for n in cg["nodes"]}
     assert "a.py" in files
@@ -52,7 +58,18 @@ def test_builder_saves_valid_json(tmp_path):
     cg = {
         "version": "1.0",
         "project_root": "x",
-        "nodes": [{"id": "a.py:foo", "label": "foo", "file": "a.py", "line": 1, "type": "function"}],
+        "nodes": [
+            {
+                "id": "a.py:foo",
+                "label": "foo",
+                "file": "a.py",
+                "line": 1,
+                "type": "function",
+                "smells": [],
+                "is_smelly": False,
+                "calls_smelly": False,
+            }
+        ],
         "edges": [],
     }
 
@@ -63,3 +80,6 @@ def test_builder_saves_valid_json(tmp_path):
     loaded = json.loads(out.read_text(encoding="utf-8"))
     assert loaded["version"] == "1.0"
     assert loaded["nodes"][0]["id"] == "a.py:foo"
+    assert loaded["nodes"][0]["smells"] == []
+    assert loaded["nodes"][0]["is_smelly"] is False
+    assert loaded["nodes"][0]["calls_smelly"] is False

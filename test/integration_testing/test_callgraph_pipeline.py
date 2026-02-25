@@ -22,7 +22,6 @@ def test_pipeline_generates_callgraph_json(tmp_path):
     )
 
     analyzer = ProjectAnalyzer(str(out_dir))
-    # Enable callgraph so callgraph.json is generated
     analyzer.analyze_project(str(project_dir), enable_callgraph=True)
 
     cg_path = out_dir / "output" / "callgraph.json"
@@ -36,3 +35,16 @@ def test_pipeline_generates_callgraph_json(tmp_path):
 
     edges = {(e["source"], e["target"]) for e in cg["edges"]}
     assert ("a.py:foo", "b.py:bar") in edges
+
+    by_id = {n["id"]: n for n in cg["nodes"]}
+
+    for n in cg["nodes"]:
+        assert "smells" in n
+        assert "is_smelly" in n
+        assert "calls_smelly" in n
+        assert isinstance(n["smells"], list)
+        assert isinstance(n["is_smelly"], bool)
+        assert isinstance(n["calls_smelly"], bool)
+
+    assert by_id["a.py:foo"]["calls_smelly"] is False
+    assert by_id["b.py:bar"]["calls_smelly"] is False
