@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+import os
 
 app = FastAPI()
 
@@ -15,13 +16,13 @@ app.add_middleware(
 
 # Service URLs for testing/local deployment
 AI_ANALYSIS_SERVICE = "http://localhost:8001"
-STATIC_ANALYSIS_SERVICE = "http://localhost:8002"
-REPORT_SERVICE = "http://localhost:8003"
 
 # Service URLs for docker deployement
-""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001"
-STATIC_ANALYSIS_SERVICE = "http://static_analysis_service:8002"
-REPORT_SERVICE = "http://report_service:8003" """
+""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001""""
+
+# Service URLs (uniform: local defaults, docker via env vars)
+STATIC_ANALYSIS_SERVICE = os.getenv("STATIC_ANALYSIS_SERVICE", "http://localhost:8002")
+REPORT_SERVICE = os.getenv("REPORT_SERVICE", "http://localhost:8003")
 
 
 @app.get("/")
