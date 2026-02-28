@@ -14,8 +14,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Service URLs for testing/local deployment
+AI_ANALYSIS_SERVICE = "http://localhost:8001"
+
+# Service URLs for docker deployement
+""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001""""
+
 # Service URLs (uniform: local defaults, docker via env vars)
-AI_ANALYSIS_SERVICE = os.getenv("AI_ANALYSIS_SERVICE", "http://localhost:8001")
 STATIC_ANALYSIS_SERVICE = os.getenv("STATIC_ANALYSIS_SERVICE", "http://localhost:8002")
 REPORT_SERVICE = os.getenv("REPORT_SERVICE", "http://localhost:8003")
 
