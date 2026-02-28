@@ -1,17 +1,21 @@
 from pydantic import BaseModel
+from typing import List, Optional
 
+class FilePayload(BaseModel):
+    filename: str
+    content: str
 
 class DetectSmellRequest(BaseModel):
     """
     Schema for the request body to detect code smells.
     """
-
-    code_snippet: str
+    # Manteniamo il code_snippet per retrocompatibilità, ma aggiungiamo la lista di file
+    code_snippet: Optional[str] = None
+    files: Optional[List[FilePayload]] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
-                """code_snippet": "def example_function():\n
-                print('Hello, world!')""",
+                "files": [{"filename": "main.py", "content": "print('Hello, world!')"}]
             }
         }

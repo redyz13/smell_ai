@@ -12,11 +12,22 @@ except ModuleNotFoundError:
 
 router = APIRouter()
 
-
 @router.post("/detect_smell_static", response_model=DetectSmellStaticResponse)
-async def detect_smell_static(payload: DetectSmellRequest):
-    analysis_result = detect_static(payload.code_snippet)
+def detect_smell_static(payload: DetectSmellRequest):
+    files_list = []
+    
+    # Raccogliamo i file dal frontend
+    if payload.files:
+        files_list = [{"filename": f.filename, "content": f.content} for f in payload.files]
+    elif payload.code_snippet:
+        files_list = [{"filename": "snippet.py", "content": payload.code_snippet}]
+        
+    # Passiamo la lista all'analisi
+    analysis_result = detect_static(files_list)
+    
+    # Restituiamo TUTTI i dati, incluso il graph_data!
     return DetectSmellStaticResponse(
-        success=analysis_result["success"],
-        smells=analysis_result["response"],
+        success=analysis_result.get("success", False),
+        smells=analysis_result.get("response", []),
+        graph_data=analysis_result.get("graph_data")
     )

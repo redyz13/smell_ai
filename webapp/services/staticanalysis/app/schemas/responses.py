@@ -1,18 +1,15 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel
-
 
 class Smell(BaseModel):
     """
     Represents a detected code smell.
     """
-
     function_name: str
     line: int
     smell_name: str
     description: str
     additional_info: str
-
 
 class DetectSmellStaticResponse(BaseModel):
     """
@@ -20,21 +17,22 @@ class DetectSmellStaticResponse(BaseModel):
     """
     success: bool
     smells: Optional[Union[List[Smell], str]] = []
+    # AGGIUNTO IL CAMPO PER IL CALL GRAPH
+    graph_data: Optional[Dict[str, Any]] = None 
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
-                "success": {"true"},
+                "success": True,
                 "smells": [
                     {
                         "function_name": "example_function",
                         "smell_name": "Unnecessary DataFrame Operation",
                         "line": 2,
-                        "description":
-                        "The column 'b' is created but not used further.",
-                        "additional_info":
-                        "Consider removing or optimizing the operation.",
+                        "description": "The column 'b' is created but not used further.",
+                        "additional_info": "Consider removing or optimizing the operation.",
                     }
                 ],
+                "graph_data": None
             }
         }

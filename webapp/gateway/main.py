@@ -18,7 +18,7 @@ app.add_middleware(
 AI_ANALYSIS_SERVICE = "http://localhost:8001"
 
 # Service URLs for docker deployement
-""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001""""
+""" AI_ANALYSIS_SERVICE = "http://ai_analysis_service:8001"""
 
 # Service URLs (uniform: local defaults, docker via env vars)
 STATIC_ANALYSIS_SERVICE = os.getenv("STATIC_ANALYSIS_SERVICE", "http://localhost:8002")
@@ -53,11 +53,21 @@ async def detect_smell_ai(request: dict):
 # Proxy requests to Static Analysis Service
 @app.post("/api/detect_smell_static")
 async def detect_smell_static(request: dict):
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"{STATIC_ANALYSIS_SERVICE}/detect_smell_static", json=request
-        )
-    return response.json()
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{STATIC_ANALYSIS_SERVICE}/detect_smell_static", 
+                json=request,
+                timeout=500.0,  # <-- TIMEOUT AGGIUNTO QUI PER EVITARE IL CRASH
+            )
+        return response.json()
+    except httpx.RequestError as exc:
+        return {
+            "success": False,
+            "error": f"Request to Static Analysis Service failed: {str(exc)}",
+        }
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Request to Static Analysis Service timed out"}
 
 
 # Proxy requests to Report Service
