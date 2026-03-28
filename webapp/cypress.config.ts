@@ -9,6 +9,11 @@ export default defineConfig({
     setupNodeEvents(on, config) {
       // implement node event listeners here
     },
+    // --- AGGIUNTE PER OTTIMIZZARE LA MEMORIA ---
+    // Forza la Garbage Collection tra un test e l'altro per prevenire crash
+    experimentalMemoryManagement: true,
+    // Evita di conservare gli snapshot della UI nella RAM
+    numTestsKeptInMemory: 0,
   },
 
   component: {

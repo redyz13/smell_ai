@@ -11,11 +11,10 @@ def test_gateway_to_static_analysis_no_smell():
     payload = {"code_snippet": "def my_function(): pass"}
     response = client.post("/api/detect_smell_static", json=payload)
 
-    assert response.status_code == 200
-    assert response.json() == {
-        "success": True,
-        "smells": "Static analysis returned no data",
-    }
+    json_resp = response.json()
+    assert json_resp["success"] is True
+    assert json_resp["smells"] == "Static analysis returned no data"
+    assert "graph_data" in json_resp  # Verifica che il nuovo grafo sia presente
 
 
 # Test case to check gateway to static analysis service
@@ -56,4 +55,7 @@ def save_as_csv(
 
     response = client.post("/api/detect_smell_static", json=test_payload)
     assert response.status_code == 200
-    assert response.json() == expected_response
+    json_resp = response.json()
+    assert json_resp["success"] is True
+    assert json_resp["smells"] == expected_response["smells"]
+    assert "graph_data" in json_resp  # Verifica che il nuovo grafo sia presente

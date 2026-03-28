@@ -33,22 +33,26 @@ describe("UploadProjectPage", () => {
     expect(screen.getByText(/Select Analysis Mode:/)).toBeInTheDocument();
   });
 
-  it("toggles analysis mode between AI and Static", () => {
+  
+it("toggles analysis mode between AI and Static", () => {
     render(<UploadProjectPage />, { wrapper: Wrapper });
 
     const aiButton = screen.getByText("AI-Based");
     const staticButton = screen.getByText("Static Tool");
 
-    expect(aiButton).toHaveClass("bg-red-600");
-    expect(staticButton).toHaveClass("bg-gray-200");
-
-    fireEvent.click(staticButton);
-    expect(aiButton).toHaveClass("bg-gray-200");
+    // 1. Verifichiamo il nuovo stato iniziale: Static è attivo (blu), AI è inattivo (grigio)
     expect(staticButton).toHaveClass("bg-blue-600");
+    expect(aiButton).toHaveClass("bg-gray-200");
 
+    // 2. Clicchiamo su AI e verifichiamo che si attivi (rosso) e Static si disattivi
     fireEvent.click(aiButton);
     expect(aiButton).toHaveClass("bg-red-600");
     expect(staticButton).toHaveClass("bg-gray-200");
+
+    // 3. Clicchiamo di nuovo su Static per tornare allo stato precedente
+    fireEvent.click(staticButton);
+    expect(staticButton).toHaveClass("bg-blue-600");
+    expect(aiButton).toHaveClass("bg-gray-200");
   });
 
   it("calls addProject when the Add Project button is clicked", async () => {
