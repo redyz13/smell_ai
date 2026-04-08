@@ -17,27 +17,20 @@ declare global {
 }
 
 describe('Report Generator Page (E2E)', () => {
-
     it('should display header, footer, and essential components', () => {
         cy.visit('http://localhost:3000/reports');
-        
         cy.get('header').should('exist');
         cy.get('footer').should('exist');
-
         cy.contains('Total Projects Available').should('exist');
-
         cy.get('button').contains('Generate Report').should('exist');
     });
 
     it('should display an alert when no projects are available', () => {
         cy.visit('http://localhost:3000/reports');
-
         cy.get('button').contains('Generate Report').click();
-
         cy.on('window:alert', (text: any) => {
             expect(text).to.equal('No projects available. Please add projects before generating reports.');
         });
-
         cy.get('#chart-div').should('not.exist');
     });
 
@@ -45,7 +38,6 @@ describe('Report Generator Page (E2E)', () => {
         cy.visit('http://localhost:3000/reports');
         cy.window().should('have.property', '__REACT_CONTEXT__').and('not.be.undefined');
     
-        // Inseriamo direttamente un progetto mockato nel contesto
         cy.window().then((win: Cypress.CustomWindow) => {
             const context = win.__REACT_CONTEXT__;
             if (context) {
@@ -69,18 +61,10 @@ describe('Report Generator Page (E2E)', () => {
             }
         });
 
-        // 1. Aspettiamo che React aggiorni la UI con il progetto fittizio
         cy.contains('Total Projects Available: 1', { timeout: 15000 }).should('exist');
-
-        // 2. Diciamo a Cypress di intercettare e "ascoltare" la chiamata API reale
         cy.intercept('POST', '**/api/generate_report*').as('generateReport');
-
         cy.contains('Generate Report').click();
-
-        // 3. Aspettiamo che la chiamata API termini con successo (status 200)
         cy.wait('@generateReport', { timeout: 15000 }).its('response.statusCode').should('eq', 200);
-
-        // 4. Verifichiamo la UI
         cy.get('#chart-div', { timeout: 10000 }).should('exist');
         cy.contains('Smell Occurrences for All Projects').should('exist');
         cy.contains('Download Report as PDF').click();
@@ -112,18 +96,11 @@ describe('Report Generator Page (E2E)', () => {
             }
         });
 
-        // Aspettiamo l'aggiornamento della UI
         cy.contains('Total Projects Available: 1', { timeout: 15000 }).should('exist');
-
-        // Intercettiamo l'API simulando un errore 500
         cy.intercept('POST', '**/api/generate_report*', { statusCode: 500, body: { error: 'Internal Server Error' } }).as('apiFailure');
-        
         cy.contains('Generate Report').click();
-        
         cy.wait('@apiFailure', { timeout: 10000 });
         cy.get('#chart-div').should('not.exist');
-        
-        // Controllo generico (case-insensitive) per la parola errore
         cy.contains(/error/i, { timeout: 10000 }).should('be.visible');
     });
 
@@ -151,5 +128,4 @@ describe('Report Generator Page (E2E)', () => {
         cy.get('#chart-div').should('not.exist');
         cy.contains('No smell data to display.').should('exist');
     });
-
 });

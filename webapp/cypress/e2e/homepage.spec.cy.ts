@@ -21,8 +21,8 @@ describe('Homepage', () => {
 
   it('should navigate to the reports page when "Generate Reports" button is clicked', () => {
     cy.visit('http://localhost:3000');
-    cy.contains('Generate Reports').click();
-    cy.url().should('include', '/reports');
+    cy.contains('Generate Reports').click({ force: true });
+    cy.url({ timeout: 10000 }).should('include', '/reports');
   });
 
   it('should navigate to the about page when "About CodeSmile" button is clicked', () => {

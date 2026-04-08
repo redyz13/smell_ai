@@ -37,9 +37,7 @@ describe('Upload Project Page', () => {
     const file1 = 'model_training_and_evaluation/model.py';
     const file2 = 'model_training_and_evaluation/dataset_preparation.py';
 
-    // 1. Diciamo a Cypress di "ascoltare" la chiamata API di analisi
     cy.intercept('POST', '**/api/detect_smell_*').as('analyzeCall');
-
     cy.contains('Add Project').click();
 
     cy.fixture(file1, 'utf8').then((fileContent1) => {
@@ -52,12 +50,59 @@ describe('Upload Project Page', () => {
     });
 
     cy.contains('Upload and Analyze All Projects').click();
-    
-    // 2. Aspettiamo fisicamente che il backend finisca l'analisi con status 200 (Successo)
     cy.wait('@analyzeCall', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
-    
-    // 3. Verifichiamo che il caricamento sia finito (il bottone principale torna cliccabile)
     cy.contains('Upload and Analyze All Projects').should('not.be.disabled');
+  });
+
+  it('should display and interact with the Call Graph visualization', () => {
+    cy.contains('Static Tool').click();
+
+    cy.intercept('POST', '**/api/detect_smell_*', {
+      statusCode: 200,
+      body: {
+        success: true,
+        smells: [
+          { function_name: "clean_data", line: 13, smell_name: "empty_column_misinitialization" }
+        ],
+        graph_data: {
+          nodes: [
+            { id: "data_processor.py:clean_data", label: "clean_data", is_smelly: true, calls_smelly: false, file: "data_processor.py" },
+            { id: "main.py:start", label: "start", is_smelly: false, calls_smelly: true, file: "main.py" }
+          ],
+          edges: [
+            { source: "main.py:start", target: "data_processor.py:clean_data" }
+          ]
+        }
+      }
+    }).as('analyzeCallGraph');
+
+    cy.contains('Add Project').click();
+    const file1 = 'model_training_and_evaluation/model.py';
+    
+    cy.fixture(file1, 'utf8').then((fileContent) => {
+      cy.get('[data-testid="file-input"]').attachFile({
+        fileContent, fileName: "model.py", mimeType: 'text/x-python'
+      });
+    });
+
+    cy.contains('Upload and Analyze All Projects').click();
+    cy.wait('@analyzeCallGraph', { timeout: 30000 });
+
+    cy.contains('Call Graph Visualization').should('be.visible');
+    cy.get('.react-flow').should('be.visible'); 
+
+    cy.contains('Nodi Smelly (Rosso)').should('be.visible');
+    cy.contains('Dipendenti (Arancione)').should('be.visible');
+    cy.contains('Clean (Verde)').should('be.visible');
+
+    cy.get('.react-flow__node').first().click({ force: true });
+    
+    cy.contains('Dettagli Nodo').should('be.visible');
+    cy.contains('ID:').should('be.visible');
+    cy.contains('File:').should('be.visible');
+
+    cy.contains('Export JSON').should('be.visible');
+    cy.contains('Export PNG').should('be.visible');
   });
 
   it('should allow the user to add a project and view analysis result (ai)', () => {
@@ -67,7 +112,6 @@ describe('Upload Project Page', () => {
     const file2 = 'model_training_and_evaluation/dataset_preparation.py';
 
     cy.intercept('POST', '**/api/detect_smell_*').as('analyzeCall');
-
     cy.contains('Add Project').click();
 
     cy.fixture(file1, 'utf8').then((fileContent1) => {
@@ -80,9 +124,6 @@ describe('Upload Project Page', () => {
     });
 
     cy.contains('Upload and Analyze All Projects').click();
-    
-    // Per l'AI ci limitiamo ad aspettare l'API. Fallirà (come previsto dal Test Plan) 
-    // perché non c'è Ollama, ma almeno non andrà in timeout cercando componenti UI inesistenti.
     cy.wait('@analyzeCall', { timeout: 30000 });
   });
 
@@ -106,8 +147,6 @@ describe('Upload Project Page', () => {
     cy.contains('Upload and Analyze All Projects').click();
 
     cy.wait('@apiFailure').its('response.statusCode').should('eq', 500);
-
-    // Usa una regex per catturare qualsiasi messaggio contenga "error" o "failed"
     cy.contains(/error|failed/i, { timeout: 10000 }).should('be.visible');
   });
 });

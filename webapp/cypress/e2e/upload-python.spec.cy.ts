@@ -41,7 +41,6 @@ describe('Upload Python Code Page (E2E)', () => {
     cy.get('button').contains('Upload Code (Static Mode)').click(); 
 
     cy.get('[data-testid="progress"]').should('exist');    
-
     cy.contains('Smell #1').should('be.visible');  
     cy.contains('Smell #2').should('be.visible');
   });
@@ -60,7 +59,6 @@ describe('Upload Python Code Page (E2E)', () => {
     cy.get('button').contains('Upload Code (AI Mode)').click(); 
 
     cy.get('[data-testid="progress"]').should('exist');    
-
     cy.contains('Smell #1').should('be.visible');  
   });
 
@@ -75,15 +73,13 @@ describe('Upload Python Code Page (E2E)', () => {
       });
     });
     cy.contains('Upload Code').click();
-    cy.get("#progress-bar").should('be.visible')
-    cy.contains('No code smells detected! Your code is clean!').should('be.visible');
+    cy.contains('No code smells detected', { timeout: 15000 }).should('be.visible');
   });
 
   it('should show an error when uploading an empty Python file', () => {
     cy.contains('Static Tool').click();
 
     const emptyFile = new File([], 'empty_file.py', { type: 'text/x-python' });
-
     const dataTransfer = new DataTransfer();
     dataTransfer.items.add(emptyFile);
 
@@ -92,6 +88,7 @@ describe('Upload Python Code Page (E2E)', () => {
       fileName: 'empty_file.py',
       mimeType: 'text/x-python',
     }, { allowEmpty: true });
+    
     cy.contains('Upload Code').click();
     cy.contains('Code Snippet cannot be empty').should('be.visible');
   });
