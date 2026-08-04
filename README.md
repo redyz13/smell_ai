@@ -1,4 +1,4 @@
-## 🎓 ISTA — CodeSmile Evolution Project
+## 🩻 ISTA — CodeSmile Evolution Project
 
 This repository contains an evolved version of **CodeSmile**, developed as part of the **Ingegneria del Software: Tecniche Avanzate (ISTA)** course.
 
