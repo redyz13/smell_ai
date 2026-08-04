@@ -84,6 +84,15 @@ python -m cli.cli_runner --input <input_directory> --output <output_directory> [
 - --max_walkers: Number of workers to use for parallel execution (default: 5). Only applicable if --parallel is enabled.
 - --resume: Resume a previous analysis from where it stopped.
 - --multiple: Analyze multiple projects within the input folder.
+- --enable-callgraph: Generate the Call Graph for the analyzed project(s) (disabled by default).
+- --callgraph-output: Save the generated Call Graph to the specified path. Requires --enable-callgraph.
+- --exclude-paths: Exclude one or more files or directories from the analysis.
+- --format: Select the smell report format, either csv (default) or json.
+
+Example with Call Graph generation and JSON smell reports:
+```bash
+python -m cli.cli_runner --input ./project --output ./output --enable-callgraph --callgraph-output ./output/callgraph.json --exclude-paths .venv tests --format json
+```
 
 #### GUI
 ```bash
