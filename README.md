@@ -9,10 +9,13 @@ The project focused on maintaining and extending the original system through fou
 - Improved portability between **local and Docker environments**, without requiring manual code changes;
 - An interactive **Call Graph visualization** integrated into the Web Application, including semantic node coloring, filters, node details, and export features.
 
-The evolution was supported by reverse engineering, impact analysis, multi-level testing, and regression testing. The existing **AI-Based Detection Tool** was not functionally modified and remained outside the scope of the project.
+The evolution followed a complete software maintenance process: comprehension and reverse engineering of the existing system, definition of the pre-modification testing baseline, analysis and resolution of existing test incidents, specification of the Change Requests, impact analysis, implementation, post-modification testing, and regression testing. The final system was validated against the acceptance criteria defined before implementation.
+
+The complete project documentation, including reverse engineering, testing documents, Change Requests, impact analysis, and the final report, is available in [`_ista_docs/`](./_ista_docs/).
+
+The existing **AI-Based Detection Tool** was not functionally modified and remained outside the scope of the project.
 
 ---
-
 <p align="center">
   <img src="./code_smile_logo.png" alt="CodeSmile" width="200"/>
 </p>
