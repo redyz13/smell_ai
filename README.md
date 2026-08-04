@@ -1,3 +1,18 @@
+## 🎓 ISTA — CodeSmile Evolution Project
+
+This repository contains an evolved version of **CodeSmile**, developed as part of the **Ingegneria del Software: Tecniche Avanzate (ISTA)** course.
+
+The project focused on maintaining and extending the original system through four main changes:
+
+- Generation of an AST-based **Call Graph**, integrated into the existing static analysis pipeline;
+- New advanced **CLI options** for configuring Call Graph generation, output paths, excluded directories, and report formats;
+- Improved portability between **local and Docker environments**, without requiring manual code changes;
+- An interactive **Call Graph visualization** integrated into the Web Application, including semantic node coloring, filters, node details, and export features.
+
+The evolution was supported by reverse engineering, impact analysis, multi-level testing, and regression testing. The existing **AI-Based Detection Tool** was not functionally modified and remained outside the scope of the project.
+
+---
+
 <p align="center">
   <img src="./code_smile_logo.png" alt="CodeSmile" width="200"/>
 </p>
@@ -187,40 +202,3 @@ This project builds on the research presented in:
 - [Read the full paper](https://arxiv.org/abs/2403.08311) and [appendix](https://figshare.com/articles/online_resource/When_Code_Smells_Meet_ML_On_the_Lifecycle_of_ML-specific_Code_Smells_in_ML-enabled_Systems_-_Appendix/25231817?file=44582128)
 
 Improvements and Experimental development of the web application and the AI-Based Detector were carried out by **[Dario Mazza](https://github.com/xDaryamo)** and **[Nicolò Delogu](https://github.com/XJustUnluckyX)** as part of the *Software Engineering: Management and Evolution* and _Software Engineering for AI_ courses in the Master's Degree program in Computer Science.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
