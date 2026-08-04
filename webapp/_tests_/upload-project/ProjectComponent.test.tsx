@@ -10,15 +10,22 @@ jest.mock("../../context/ProjectContext", () => ({
   useProjectContext: jest.fn(),
 }));
 
+jest.mock("../../components/CallGraphViewer", () => ({
+  __esModule: true,
+  default: () => <div data-testid="call-graph-viewer">Call Graph</div>,
+}));
+
 describe("Project Component", () => {
   const mockRemoveProject = jest.fn();
   const mockAddProject = jest.fn();
 
-  let mockProjects: { name: string; files: File[] }[] = [
+  let mockProjects: any[] = [
     { name: "Test Project 1", files: [] },
   ];
 
   beforeEach(() => {
+    mockProjects = [{ name: "Test Project 1", files: [] }];
+
     // Mock the `webkitRelativePath` using the real `File` constructor.
     const fileMock = new File(["content"], "example.py", {
       type: "text/plain",
@@ -77,5 +84,28 @@ describe("Project Component", () => {
 
     // Check if removeProject is called with the correct argument
     expect(mockRemoveProject).toHaveBeenCalledWith(0);
+  });
+
+  it("keeps textual results visible alongside the CR4 Call Graph", () => {
+    mockProjects[0] = {
+      name: "Analyzed Project",
+      files: [],
+      data: {
+        files: ["project/example.py"],
+        message: "Project successfully analyzed!",
+        result: "Detected smell in example.py",
+        smells: [],
+        graphData: { nodes: [], edges: [] },
+        smellyFunctions: [],
+      },
+      isLoading: false,
+    };
+
+    render(<Project index={0} />);
+
+    expect(screen.getByText("View Analysis Results")).toBeInTheDocument();
+    expect(screen.getByText("Detected smell in example.py")).toBeInTheDocument();
+    expect(screen.getByText("Call Graph Visualization")).toBeInTheDocument();
+    expect(screen.getByTestId("call-graph-viewer")).toBeInTheDocument();
   });
 });

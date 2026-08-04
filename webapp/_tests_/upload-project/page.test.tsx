@@ -116,6 +116,61 @@ it("toggles analysis mode between AI and Static", () => {
     await waitFor(() => expect(mockUpdateProject).toHaveBeenCalledTimes(2));
   });
 
+  it("preserves webkitRelativePath in the static-analysis payload", async () => {
+    const mockUpdateProject = jest.fn();
+    const file = new File(["def run(): pass"], "module.py", { type: "text/x-python" });
+    Object.defineProperty(file, "webkitRelativePath", {
+      value: "sample_project/pkg/module.py",
+    });
+    Object.defineProperty(file, "text", {
+      value: jest.fn().mockResolvedValue("def run(): pass"),
+    });
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        success: true,
+        smells: [],
+        graph_data: { nodes: [], edges: [] },
+      }),
+    }) as jest.Mock;
+
+    render(<UploadProjectPage />, {
+      wrapper: ({ children }) => (
+        <ProjectContext.Provider value={{
+          projects: [{
+            name: "sample_project",
+            files: [file],
+            data: { files: null, message: "", result: null, smells: [] },
+            isLoading: false,
+          }],
+          addProject: jest.fn(),
+          updateProject: mockUpdateProject,
+          removeProject: jest.fn(),
+        }}>
+          {children}
+        </ProjectContext.Provider>
+      ),
+    });
+
+    fireEvent.click(screen.getByText("Upload and Analyze All Projects"));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const request = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(JSON.parse(request.body)).toEqual({
+      files: [{
+        filename: "sample_project/pkg/module.py",
+        content: "def run(): pass",
+      }],
+    });
+    await waitFor(() => {
+      expect(mockUpdateProject).toHaveBeenLastCalledWith(0, expect.objectContaining({
+        isLoading: false,
+        data: expect.objectContaining({ files: ["sample_project/pkg/module.py"] }),
+      }));
+    });
+  });
+
   it("disables the submit button when projects are loading", async () => {
 
     const { rerender } = render(<UploadProjectPage />, {

@@ -3,7 +3,8 @@
 import React, { useRef, useEffect } from "react";
 import { useProjectContext } from "../context/ProjectContext";
 import { motion } from "framer-motion";
-import CallGraphViewer from "./CallGraphViewer"; 
+import CallGraphViewer from "./CallGraphViewer";
+import AnalysisResults from "./Project/AnalysisResult";
 
 type ProjectProps = {
   index: number;
@@ -28,11 +29,19 @@ const Project: React.FC<ProjectProps> = ({ index }) => {
     );
 
     if (filteredFiles.length > 0) {
-      const folderName = filteredFiles[0].webkitRelativePath.split("/")[0];
+      const firstPath = filteredFiles[0].webkitRelativePath || filteredFiles[0].name;
+      const folderName = firstPath.split("/")[0];
       updateProject(index, {
         files: filteredFiles,
         name: folderName,
-        data: null 
+        data: {
+          files: filteredFiles.map((file) => file.webkitRelativePath || file.name),
+          message: "",
+          result: null,
+          smells: null,
+          graphData: null,
+          smellyFunctions: [],
+        },
       });
     }
   };
@@ -64,8 +73,8 @@ const Project: React.FC<ProjectProps> = ({ index }) => {
           animate={{ opacity: 1 }}
         >
           {Array.from(project.files).map((file) => (
-            <li key={file.name} className="hover:text-blue-600">
-              📄 {file.name}
+            <li key={file.webkitRelativePath || file.name} className="hover:text-blue-600">
+              📄 {file.webkitRelativePath || file.name}
             </li>
           ))}
         </motion.ul>
@@ -90,13 +99,16 @@ const Project: React.FC<ProjectProps> = ({ index }) => {
         </p>
       )}
 
+      {/* CR4 affianca il grafo ai risultati testuali esistenti. */}
+      {project.data?.result && <AnalysisResults result={project.data.result} />}
+
       {/* Visualizzazione Call Graph (CR4) */}
       {project.data?.graphData && (
         <div className="mt-8 border-t pt-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Call Graph Visualization</h3>
           <CallGraphViewer 
             graphData={project.data.graphData} 
-            smellyFunctions={project.data.smellyFunctions} 
+            smellyFunctions={project.data.smellyFunctions || []}
           />
         </div>
       )}

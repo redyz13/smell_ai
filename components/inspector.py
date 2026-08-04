@@ -68,6 +68,7 @@ class Inspector:
             # Parse the file into an AST
             tree = ast.parse(source)
             lines = source.splitlines()
+            function_names = self._qualified_function_names(tree)
 
             if include_callgraph:
                 callgraph_fragment = self.callgraph_extractor.extract(tree, filename)
@@ -82,7 +83,7 @@ class Inspector:
             dataframe_variables_by_function = {}
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
-                    function_name = node.name
+                    function_name = function_names[id(node)]
                     variables_by_function[function_name] = (
                         self.variable_extractor.extract_variable_definitions(
                             node
@@ -103,9 +104,10 @@ class Inspector:
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef):
                     try:
+                        function_name = function_names[id(node)]
                         function_data = {
                             "libraries": libraries,
-                            "variables": variables_by_function[node.name],
+                            "variables": variables_by_function[function_name],
                             "lines": {
                                 n.lineno: lines[n.lineno - 1]
                                 for n in ast.walk(tree)
@@ -113,7 +115,7 @@ class Inspector:
                             },
                             "dataframe_methods": dataframe_methods,
                             "dataframe_variables": (
-                                dataframe_variables_by_function[node.name]
+                                dataframe_variables_by_function[function_name]
                             ),
                             "tensor_operations": tensor_operations.get(
                                 "operation", []
@@ -128,7 +130,11 @@ class Inspector:
 
                         # Pass data to the Rule Checker
                         to_save = self.rule_checker.rule_check(
-                            node, function_data, filename, node.name, to_save
+                            node,
+                            function_data,
+                            filename,
+                            function_name,
+                            to_save,
                         )
                     except Exception as e:
                         print(
@@ -151,6 +157,28 @@ class Inspector:
             return to_save, callgraph_fragment
 
         return to_save
+
+    @staticmethod
+    def _qualified_function_names(tree: ast.AST) -> dict[int, str]:
+        """Map function AST nodes to the identifiers used by the Call Graph."""
+        names: dict[int, str] = {}
+
+        for node in getattr(tree, "body", []):
+            if isinstance(node, ast.FunctionDef):
+                names[id(node)] = node.name
+            elif isinstance(node, ast.ClassDef):
+                for item in node.body:
+                    if isinstance(item, ast.FunctionDef):
+                        names[id(item)] = f"{node.name}.{item.name}"
+
+        # Inspector historically visits nested functions as well. Keep their
+        # existing simple name because the current Call Graph does not expose
+        # nested definitions as nodes.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                names.setdefault(id(node), node.name)
+
+        return names
 
     def _setup(
         self,

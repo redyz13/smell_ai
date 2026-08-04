@@ -62,12 +62,32 @@ describe('Upload Project Page', () => {
       body: {
         success: true,
         smells: [
-          { function_name: "clean_data", line: 13, smell_name: "empty_column_misinitialization" }
+          {
+            function_name: "clean_data",
+            line: 13,
+            smell_name: "empty_column_misinitialization",
+            description: "Column initialized incorrectly",
+            additional_info: "",
+          }
         ],
         graph_data: {
           nodes: [
-            { id: "data_processor.py:clean_data", label: "clean_data", is_smelly: true, calls_smelly: false, file: "data_processor.py" },
-            { id: "main.py:start", label: "start", is_smelly: false, calls_smelly: true, file: "main.py" }
+            {
+              id: "data_processor.py:clean_data",
+              label: "clean_data",
+              is_smelly: true,
+              calls_smelly: false,
+              file: "data_processor.py",
+              smells: [{
+                function_name: "clean_data",
+                line: 13,
+                smell_name: "empty_column_misinitialization",
+                description: "Column initialized incorrectly",
+                additional_info: "",
+              }],
+            },
+            { id: "main.py:start", label: "start", is_smelly: false, calls_smelly: true, file: "main.py", smells: [] },
+            { id: "helpers.py:normalize", label: "normalize", is_smelly: false, calls_smelly: false, file: "helpers.py", smells: [] }
           ],
           edges: [
             { source: "main.py:start", target: "data_processor.py:clean_data" }
@@ -90,22 +110,40 @@ describe('Upload Project Page', () => {
 
     cy.contains('Call Graph Visualization').should('be.visible');
     cy.get('.react-flow').should('be.visible'); 
+    cy.contains('View Analysis Results').click();
+    cy.get('pre').should('contain.text', 'clean_data');
 
     cy.contains('Nodi Smelly (Rosso)').should('be.visible');
     cy.contains('Dipendenti (Arancione)').should('be.visible');
     cy.contains('Clean (Verde)').should('be.visible');
 
-    cy.get('.react-flow__node').first().click({ force: true });
+    cy.contains('.react-flow__node', 'clean_data')
+      .should('have.css', 'background-color', 'rgb(254, 226, 226)');
+    cy.contains('.react-flow__node', 'start')
+      .should('have.css', 'background-color', 'rgb(255, 237, 213)');
+    cy.contains('.react-flow__node', 'normalize')
+      .should('have.css', 'background-color', 'rgb(220, 252, 231)');
+
+    cy.contains('label', 'Nodi Smelly (Rosso)').find('input').uncheck();
+    cy.contains('.react-flow__node', 'clean_data').should('not.exist');
+    cy.contains('label', 'Nodi Smelly (Rosso)').find('input').check();
+
+    cy.contains('.react-flow__node', 'clean_data').click({ force: true })
+      .should('have.css', 'box-shadow')
+      .and('contain', 'rgb(37, 99, 235)');
     
     cy.contains('Dettagli Nodo').should('be.visible');
-    cy.contains('ID:').should('be.visible');
-    cy.contains('File:').should('be.visible');
+    cy.contains('data_processor.py:clean_data').should('be.visible');
+    cy.contains('data_processor.py').should('be.visible');
+    cy.contains('empty_column_misinitialization').should('be.visible');
+    cy.contains('Column initialized incorrectly').should('be.visible');
 
     cy.contains('Export JSON').should('be.visible');
     cy.contains('Export PNG').should('be.visible');
   });
 
-  it('should allow the user to add a project and view analysis result (ai)', () => {
+  // The external AI service is explicitly outside the ISTA test scope.
+  it.skip('should allow the user to add a project and view analysis result (ai)', () => {
     cy.contains('AI-Based').click();
 
     const file1 = 'model_training_and_evaluation/model.py';

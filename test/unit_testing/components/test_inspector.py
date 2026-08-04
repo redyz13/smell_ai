@@ -167,3 +167,23 @@ def my_function():
     ]
     assert list(result.columns) == expected_columns
     assert len(result) > 0
+
+
+def test_qualified_function_names_match_call_graph_method_ids():
+    tree = ast.parse(
+        """
+def train():
+    pass
+
+class Model:
+    def fit(self):
+        pass
+"""
+    )
+
+    names = Inspector._qualified_function_names(tree)
+    top_level = tree.body[0]
+    method = tree.body[1].body[0]
+
+    assert names[id(top_level)] == "train"
+    assert names[id(method)] == "Model.fit"

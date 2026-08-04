@@ -16,14 +16,16 @@ const UploadProjectPage = () => {
   // Gestione dell'invio di tutta la cartella
   const handleSubmitAll = async () => {
     // 1. Mettiamo tutti i progetti in stato di caricamento visivo
-    projects.forEach((_, index) => {
+    projects.forEach((project, index) => {
       updateProject(index, {
         isLoading: true,
         data: { 
+          files: project.files?.map((file) => file.webkitRelativePath || file.name) || null,
           message: "Uploading and analyzing the project...",
           result: null,
           smells: [],
-          graphData: null // Resettiamo l'eventuale grafo precedente
+          graphData: null,
+          smellyFunctions: [],
         },
       });
     });
@@ -37,7 +39,14 @@ const UploadProjectPage = () => {
         if (!project.files || project.files.length === 0) {
           updateProject(index, {
             isLoading: false,
-            data: { message: "Error, no valid files to analyze." },
+            data: {
+              files: null,
+              message: "Error, no valid files to analyze.",
+              result: null,
+              smells: [],
+              graphData: null,
+              smellyFunctions: [],
+            },
           });
           continue;
         }
@@ -50,7 +59,14 @@ const UploadProjectPage = () => {
         if (pythonFiles.length === 0) {
            updateProject(index, {
             isLoading: false,
-            data: { message: "No Python files found in this folder." },
+            data: {
+              files: null,
+              message: "No Python files found in this folder.",
+              result: null,
+              smells: [],
+              graphData: null,
+              smellyFunctions: [],
+            },
           });
           continue;
         }
@@ -58,7 +74,7 @@ const UploadProjectPage = () => {
         // Prepariamo l'array di file da inviare in un'unica soluzione al server!
         const filesPayload = await Promise.all(
           pythonFiles.map(async (file) => ({
-            filename: file.name,
+            filename: file.webkitRelativePath || file.name,
             content: await file.text()
           }))
         );
@@ -79,17 +95,20 @@ const UploadProjectPage = () => {
             if (!response.ok) throw new Error("Server responded with an error");
 
             const data = await response.json();
+            const detectedSmells = Array.isArray(data.smells)
+              ? data.smells
+              : (Array.isArray(data.response) ? data.response : []);
 
             // 3. AGGIORNIAMO IL PROGETTO SALVANDO IL GRAPH DATA!
             updateProject(index, {
               isLoading: false,
               data: {
+                files: pythonFiles.map((file) => file.webkitRelativePath || file.name),
                 message: data.success ? "Project successfully analyzed!" : "Analysis failed.",
-                result: JSON.stringify(data.smells || data.response, null, 2),
+                result: JSON.stringify(data.smells ?? data.response, null, 2) ?? null,
                 graphData: data.graph_data || null, // <-- QUESTO FARA' APPARIRE IL GRAFO!
-                smellyFunctions: Array.isArray(data.smells) 
-                    ? data.smells 
-                    : (Array.isArray(data.response) ? data.response : []), 
+                smells: detectedSmells,
+                smellyFunctions: detectedSmells,
               },
             });
 
@@ -101,7 +120,14 @@ const UploadProjectPage = () => {
              console.error("Fetch error:", fetchError);
              updateProject(index, {
                 isLoading: false,
-                data: { message: "Error contacting the analysis server." },
+                data: {
+                  files: pythonFiles.map((file) => file.webkitRelativePath || file.name),
+                  message: "Error contacting the analysis server.",
+                  result: null,
+                  smells: [],
+                  graphData: null,
+                  smellyFunctions: [],
+                },
               });
              toast.error(`Connection error on project ${index + 1}`);
         }

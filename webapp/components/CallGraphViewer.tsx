@@ -2,24 +2,22 @@
 
 import React, { useState, useMemo, useCallback, useRef } from "react";
 import ReactFlow, { 
-  MiniMap, Controls, Background, MarkerType, useNodesState, useEdgesState 
+  MiniMap, Controls, Background, MarkerType, useNodesState, useEdgesState,
+  type Node as FlowNode,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { toPng } from "html-to-image";
+import type { CallGraphData, ContextSmell } from "../types/types";
 
 type CallGraphViewerProps = {
-  graphData: {
-    nodes: Array<{ 
-        id: string; 
-        label: string; 
-        file?: string;
-        is_smelly?: boolean; 
-        calls_smelly?: boolean;
-        smells?: any[];
-    }>;
-    edges: Array<{ source: string; target: string }>;
-  };
-  smellyFunctions: Array<{ function_name: string; smell_name: string; [key: string]: any }>;
+  graphData: CallGraphData;
+  smellyFunctions?: ContextSmell[];
+};
+
+type CallGraphNodeData = {
+  label: string;
+  file?: string;
+  smells: ContextSmell[];
 };
 
 const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
@@ -31,7 +29,7 @@ const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
   const [showDependent, setShowDependent] = useState(true);
   
   // State per il nodo selezionato (Sidebar)
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [selectedNode, setSelectedNode] = useState<FlowNode<CallGraphNodeData> | null>(null);
 
   // Generiamo i nodi per React Flow usando i flag `is_smelly` e `calls_smelly` del backend!
   const initialNodes = useMemo(() => {
@@ -49,6 +47,7 @@ const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
       .map((node, index) => {
         const isSmelly = node.is_smelly;
         const isDependent = node.calls_smelly && !isSmelly;
+        const isSelected = selectedNode?.id === node.id;
         
         // Logica Colori: CR4
         const bgColor = isSmelly ? "#fee2e2" : (isDependent ? "#ffedd5" : "#dcfce7");
@@ -68,22 +67,35 @@ const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
             borderRadius: "8px",
             padding: "10px",
             fontWeight: "bold",
-            color: "#333"
-          }
+            color: "#333",
+            boxShadow: isSelected ? "0 0 0 4px #2563eb" : "none",
+          },
+          selected: isSelected,
         };
       });
-  }, [graphData.nodes, showSmelly, showClean, showDependent]);
+  }, [graphData.nodes, selectedNode, showSmelly, showClean, showDependent]);
 
   const initialEdges = useMemo(() => {
-    return graphData.edges.map((edge, index) => ({
-      id: `e${index}-${edge.source}-${edge.target}`,
-      source: edge.source,
-      target: edge.target,
-      animated: true,
-      style: { stroke: selectedNode?.id === edge.source || selectedNode?.id === edge.target ? '#2563eb' : '#9ca3af', strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#9ca3af' },
-    }));
-  }, [graphData.edges, selectedNode]);
+    const visibleNodeIds = new Set(initialNodes.map((node) => node.id));
+
+    return graphData.edges
+      .filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
+      .map((edge, index) => {
+        const isConnected = selectedNode?.id === edge.source || selectedNode?.id === edge.target;
+
+        return {
+          id: `e${index}-${edge.source}-${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          animated: true,
+          style: { stroke: isConnected ? "#2563eb" : "#9ca3af", strokeWidth: 2 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: isConnected ? "#2563eb" : "#9ca3af",
+          },
+        };
+      });
+  }, [graphData.edges, initialNodes, selectedNode]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -93,7 +105,7 @@ const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
   React.useEffect(() => { setEdges(initialEdges); }, [initialEdges, setEdges]);
 
   // Gestione Sidebar: leggiamo gli smells da `node.data.smells`
-  const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: FlowNode<CallGraphNodeData>) => {
     setSelectedNode(node);
   }, []);
 
@@ -157,7 +169,7 @@ const CallGraphViewer: React.FC<CallGraphViewerProps> = ({ graphData }) => {
               <h4 className="font-semibold text-red-600 mb-2">Smells Rilevati ({selectedNode.data.smells?.length || 0}):</h4>
               {selectedNode.data.smells && selectedNode.data.smells.length > 0 ? (
                 <ul className="list-disc pl-5 space-y-2 text-sm">
-                  {selectedNode.data.smells.map((s: any, i: number) => (
+                  {selectedNode.data.smells.map((s, i) => (
                     <li key={i}>
                       <span className="font-medium">{s.smell_name}</span> (Linea {s.line})<br/>
                       <span className="text-gray-500">{s.description}</span>
