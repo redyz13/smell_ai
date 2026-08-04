@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from cli.cli_runner import CodeSmileCLI
+from cli import cli_runner
 
 
 # Mock the ProjectAnalyzer class for testing
@@ -277,3 +278,104 @@ def test_execute_with_invalid_max_walkers_and_parallel(mock_analyzer):
 
     with pytest.raises(ValueError, match="max_walkers must be greater than 0."):
         cli.execute()
+
+
+def test_validate_rejects_callgraph_output_when_generation_is_disabled():
+    args = MagicMock()
+    args.input = "mock_input"
+    args.output = "mock_output"
+    args.parallel = False
+    args.max_walkers = 5
+    _add_cr2_args(args)
+    args.callgraph_output = "graph.json"
+
+    cli = CodeSmileCLI(args)
+
+    with pytest.raises(
+        ValueError, match="--callgraph-output requires --enable-callgraph"
+    ):
+        cli.validate_args()
+
+
+def test_execute_multiple_projects_sequentially_forwards_cr2_options(
+    mock_analyzer,
+):
+    args = MagicMock()
+    args.input = "projects"
+    args.output = "reports"
+    args.parallel = False
+    args.resume = True
+    args.multiple = True
+    args.max_walkers = 5
+    args.enable_callgraph = True
+    args.callgraph_output = "graphs"
+    args.exclude_paths = ["generated", "vendor"]
+    args.format = "json"
+
+    cli = CodeSmileCLI(args)
+    cli.analyzer = mock_analyzer
+    cli.execute()
+
+    mock_analyzer.analyze_projects_sequential.assert_called_once_with(
+        "projects",
+        resume=True,
+        enable_callgraph=True,
+        callgraph_output="graphs",
+        exclude_paths=["generated", "vendor"],
+        report_format="json",
+    )
+    mock_analyzer.merge_all_results.assert_called_once_with(
+        report_format="json"
+    )
+
+
+def test_main_parses_and_forwards_all_cr2_flags(monkeypatch):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "codesmile",
+            "--input",
+            "project",
+            "--output",
+            "reports",
+            "--enable-callgraph",
+            "--callgraph-output",
+            "graphs/callgraph.json",
+            "--exclude-paths",
+            "generated",
+            "vendor",
+            "--format",
+            "json",
+        ],
+    )
+
+    with patch("cli.cli_runner.CodeSmileCLI") as cli_class:
+        cli_runner.main()
+
+    parsed_args = cli_class.call_args.args[0]
+    assert parsed_args.enable_callgraph is True
+    assert parsed_args.callgraph_output == "graphs/callgraph.json"
+    assert parsed_args.exclude_paths == ["generated", "vendor"]
+    assert parsed_args.format == "json"
+    cli_class.return_value.execute.assert_called_once_with()
+
+
+def test_main_rejects_invalid_report_format(monkeypatch, capsys):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "codesmile",
+            "--input",
+            "project",
+            "--output",
+            "reports",
+            "--format",
+            "xml",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli_runner.main()
+
+    assert exc_info.value.code == 1
+    assert "Error: Missing required arguments or invalid input." in capsys.readouterr().out

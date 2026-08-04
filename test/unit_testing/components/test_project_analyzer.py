@@ -478,3 +478,353 @@ def test_analyze_project_empty_directory(
     assert f"The project '{project_path}' contains no Python files." == str(
         excinfo.value
     )
+
+
+@pytest.mark.parametrize(
+    ("report_format", "extension"),
+    [("csv", ".csv"), ("json", ".json")],
+)
+def test_save_results_supports_cr2_report_formats(
+    project_analyzer, report_format, extension
+):
+    results = pd.DataFrame(
+        [
+            {
+                "filename": "module.py",
+                "function_name": "work",
+                "smell_name": "example",
+            }
+        ]
+    )
+
+    project_analyzer._save_results(
+        results, "overview.csv", report_format=report_format
+    )
+
+    output_file = os.path.join(
+        project_analyzer.output_path, f"overview{extension}"
+    )
+    assert os.path.exists(output_file)
+    if report_format == "json":
+        loaded = pd.read_json(output_file)
+    else:
+        loaded = pd.read_csv(output_file)
+    assert loaded.loc[0, "function_name"] == "work"
+
+
+def test_save_results_skips_empty_reports(project_analyzer, capsys):
+    project_analyzer._save_results(
+        pd.DataFrame(), "overview.csv", report_format="json"
+    )
+
+    assert "No results to save for overview.csv" in capsys.readouterr().out
+    assert not os.path.exists(
+        os.path.join(project_analyzer.output_path, "overview.json")
+    )
+
+
+def test_build_smells_by_node_id_uses_relative_paths_and_skips_invalid_rows(
+    project_analyzer, tmp_path
+):
+    project_root = tmp_path / "project"
+    source = project_root / "src" / "model.py"
+    results = pd.DataFrame(
+        [
+            {
+                "filename": str(source),
+                "function_name": "Model.fit",
+                "smell_name": "first",
+                "line": 7,
+                "description": "description",
+                "additional_info": "details",
+            },
+            {
+                "filename": str(source),
+                "function_name": "Model.fit",
+                "smell_name": "second",
+                "line": None,
+                "description": "description",
+                "additional_info": "details",
+            },
+            {
+                "filename": "",
+                "function_name": "ignored",
+                "smell_name": "ignored",
+                "line": 1,
+            },
+            {
+                "filename": str(source),
+                "function_name": "",
+                "smell_name": "ignored",
+                "line": 1,
+            },
+        ]
+    )
+
+    smells = project_analyzer._build_smells_by_node_id(
+        results, str(project_root)
+    )
+
+    assert project_analyzer._build_smells_by_node_id(None, str(project_root)) == {}
+    assert project_analyzer._build_smells_by_node_id(
+        pd.DataFrame(), str(project_root)
+    ) == {}
+    assert list(smells) == ["src/model.py:Model.fit"]
+    assert [smell["line"] for smell in smells["src/model.py:Model.fit"]] == [
+        7,
+        -1,
+    ]
+
+
+def test_exclude_paths_support_relative_directories_and_absolute_files(
+    project_analyzer, tmp_path
+):
+    project_root = tmp_path / "project"
+    kept = project_root / "src" / "keep.py"
+    excluded_child = project_root / "generated" / "child.py"
+    excluded_exact = project_root / "skip.py"
+    filenames = [str(kept), str(excluded_child), str(excluded_exact)]
+
+    filtered = project_analyzer._filter_excluded_files(
+        filenames,
+        ["generated", "", str(excluded_exact)],
+        str(project_root),
+    )
+
+    assert filtered == [str(kept)]
+    assert project_analyzer._filter_excluded_files(
+        [], ["generated"], str(project_root)
+    ) == []
+    assert project_analyzer._filter_excluded_files(
+        filenames, [], str(project_root)
+    ) == filenames
+
+
+def test_callgraph_output_paths_cover_single_and_multiple_projects(
+    project_analyzer, tmp_path
+):
+    project = tmp_path / "project"
+
+    default_single = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=None,
+        multiple=False,
+    )
+    default_multiple = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=None,
+        multiple=True,
+    )
+    explicit_single = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=str(tmp_path / "custom" / "graph.json"),
+        multiple=False,
+    )
+    intended_directory = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=str(tmp_path / "graphs"),
+        multiple=True,
+    )
+    existing_directory = tmp_path / "graphs.bundle"
+    existing_directory.mkdir()
+    inside_existing_directory = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=str(existing_directory),
+        multiple=True,
+    )
+    suffixed_file = project_analyzer._resolve_callgraph_output_path(
+        project_path=str(project),
+        project_name="project",
+        callgraph_output=str(tmp_path / "combined.json"),
+        multiple=True,
+    )
+
+    assert default_single.endswith(os.path.join("output", "callgraph.json"))
+    assert default_multiple.endswith(
+        os.path.join("output", "project_details", "project_callgraph.json")
+    )
+    assert explicit_single == str(tmp_path / "custom" / "graph.json")
+    assert intended_directory == str(tmp_path / "graphs" / "project_callgraph.json")
+    assert inside_existing_directory == str(
+        existing_directory / "project_callgraph.json"
+    )
+    assert suffixed_file == str(tmp_path / "combined_project.json")
+
+
+def test_single_project_cr2_options_filter_files_and_write_json_callgraph(
+    monkeypatch, project_analyzer, tmp_path
+):
+    project = tmp_path / "project"
+    included = project / "src" / "main.py"
+    excluded = project / "generated" / "generated.py"
+    callgraph_output = tmp_path / "graphs" / "single.json"
+    results = pd.DataFrame(
+        [
+            {
+                "filename": str(included),
+                "function_name": "main",
+                "smell_name": "example",
+                "line": 1,
+                "description": "description",
+                "additional_info": "details",
+            }
+        ]
+    )
+    fragment = {
+        "file": str(included),
+        "nodes": [
+            {"id": f"{included}::main", "label": "main", "line": 1}
+        ],
+        "edges": [],
+    }
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.get_python_files",
+        lambda _: [str(included), str(excluded)],
+    )
+    project_analyzer.inspector.inspect = MagicMock(
+        return_value=(results, fragment)
+    )
+
+    total_smells = project_analyzer.analyze_project(
+        str(project),
+        enable_callgraph=True,
+        callgraph_output=str(callgraph_output),
+        exclude_paths=["generated"],
+        report_format="json",
+    )
+
+    assert total_smells == 1
+    project_analyzer.inspector.inspect.assert_called_once_with(
+        str(included), include_callgraph=True
+    )
+    assert os.path.exists(
+        os.path.join(project_analyzer.output_path, "overview.json")
+    )
+    assert callgraph_output.exists()
+
+
+def test_multiple_project_callgraphs_and_json_reports_sequentially(
+    monkeypatch, project_analyzer, tmp_path
+):
+    base_path = tmp_path / "projects"
+    project = base_path / "project1"
+    project.mkdir(parents=True)
+    source = project / "main.py"
+    graphs_dir = tmp_path / "graphs"
+    results = pd.DataFrame(
+        [
+            {
+                "filename": str(source),
+                "function_name": "main",
+                "smell_name": "example",
+                "line": 1,
+                "description": "description",
+                "additional_info": "details",
+            }
+        ]
+    )
+    fragment = {
+        "file": str(source),
+        "nodes": [
+            {"id": f"{source}::main", "label": "main", "line": 1}
+        ],
+        "edges": [],
+    }
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.get_python_files", lambda _: [str(source)]
+    )
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.initialize_log", lambda _: None
+    )
+    append_to_log = MagicMock()
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.append_to_log", append_to_log
+    )
+    project_analyzer.inspector.inspect = MagicMock(
+        return_value=(results, fragment)
+    )
+
+    project_analyzer.analyze_projects_sequential(
+        str(base_path),
+        enable_callgraph=True,
+        callgraph_output=str(graphs_dir),
+        report_format="json",
+    )
+
+    assert os.path.exists(
+        os.path.join(
+            project_analyzer.output_path,
+            "project_details",
+            "project1_results.json",
+        )
+    )
+    assert (graphs_dir / "project1_callgraph.json").exists()
+    append_to_log.assert_called_once_with(
+        os.path.join(str(base_path), "execution_log.txt"), "project1"
+    )
+
+
+def test_multiple_project_callgraphs_and_json_reports_in_parallel(
+    monkeypatch, project_analyzer, tmp_path
+):
+    base_path = tmp_path / "projects"
+    project = base_path / "project1"
+    project.mkdir(parents=True)
+    source = project / "main.py"
+    combined_graph = tmp_path / "combined.json"
+    results = pd.DataFrame(
+        [
+            {
+                "filename": str(source),
+                "function_name": "main",
+                "smell_name": "example",
+                "line": 1,
+                "description": "description",
+                "additional_info": "details",
+            }
+        ]
+    )
+    fragment = {
+        "file": str(source),
+        "nodes": [
+            {"id": f"{source}::main", "label": "main", "line": 1}
+        ],
+        "edges": [],
+    }
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.get_python_files", lambda _: [str(source)]
+    )
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.initialize_log", lambda _: None
+    )
+    synchronized_log = MagicMock()
+    monkeypatch.setattr(
+        "utils.file_utils.FileUtils.synchronized_append_to_log",
+        synchronized_log,
+    )
+    project_analyzer.inspector.inspect = MagicMock(
+        return_value=(results, fragment)
+    )
+
+    project_analyzer.analyze_projects_parallel(
+        str(base_path),
+        max_workers=1,
+        enable_callgraph=True,
+        callgraph_output=str(combined_graph),
+        report_format="json",
+    )
+
+    assert os.path.exists(
+        os.path.join(
+            project_analyzer.output_path,
+            "project_details",
+            "project1_results.json",
+        )
+    )
+    assert (tmp_path / "combined_project1.json").exists()
+    synchronized_log.assert_called_once()

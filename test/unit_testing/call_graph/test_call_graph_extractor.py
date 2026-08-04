@@ -87,3 +87,59 @@ def bar():
     assert ("a.py::bar", "unresolved:print") in edges
 
     assert ("a.py::<module>", "a.py::bar") not in edges
+
+
+def test_extractor_classifies_attribute_and_unknown_calls():
+    code = """
+async def background():
+    print("not module code")
+
+callback = lambda: print("not module code either")
+
+class Worker:
+    def run(self):
+        self.missing()
+        client.send()
+        package.api.fetch()
+        factory().build()
+
+def invoke_lambda():
+    (lambda: None)()
+"""
+
+    fragment = CallGraphExtractor().extract(ast.parse(code), "worker.py")
+    targets = {
+        (edge["source"], edge["target"], edge["call"])
+        for edge in fragment["edges"]
+    }
+
+    assert (
+        "worker.py::Worker.run",
+        "unresolved:self.missing",
+        "attribute",
+    ) in targets
+    assert (
+        "worker.py::Worker.run",
+        "unresolved:client.send",
+        "attribute",
+    ) in targets
+    assert (
+        "worker.py::Worker.run",
+        "unresolved:package.api.fetch",
+        "attribute",
+    ) in targets
+    assert (
+        "worker.py::Worker.run",
+        "unresolved:<expr>.build",
+        "attribute",
+    ) in targets
+    assert (
+        "worker.py::invoke_lambda",
+        "unresolved:<unknown>",
+        "unknown",
+    ) in targets
+    assert not any(
+        edge["source"] == "worker.py::<module>"
+        and edge["target"] == "unresolved:print"
+        for edge in fragment["edges"]
+    )
