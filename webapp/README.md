@@ -71,9 +71,16 @@ npm run build
 npm run start
 ```
 
-### ⚠️ Important: Switching Between Docker and Local Execution
-If you want to switch from Docker-based execution to local execution (or vice versa), ensure that the import statements in the service files match the chosen execution mode.
-Check the paths and configurations in the Python services files to avoid import-related errors.
+### **Switching Between Docker and Local Execution**
+
+No source-code or import changes are required when switching execution mode. For
+local execution, the gateway uses `http://localhost:8002` and
+`http://localhost:8003` as the default URLs for the static-analysis and report
+services. Docker Compose injects the corresponding container URLs through the
+`STATIC_ANALYSIS_SERVICE` and `REPORT_SERVICE` environment variables.
+
+Stop the currently running services before switching mode to avoid port
+conflicts, then use the commands from the relevant section above.
 
 ## **Ollama set up**
 
