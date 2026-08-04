@@ -63,6 +63,8 @@ fi
 PY_BIN="python"
 if [[ -x "${REPO_ROOT}/venv/bin/python" ]]; then
   PY_BIN="${REPO_ROOT}/venv/bin/python"
+elif [[ -x "${REPO_ROOT}/venv/Scripts/python.exe" ]]; then
+  PY_BIN="${REPO_ROOT}/venv/Scripts/python.exe"
 fi
 
 mkdir -p "${OUT_BASE}/logs"

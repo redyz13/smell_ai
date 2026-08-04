@@ -1,14 +1,5 @@
 import pytest
-import tkinter as tk
 from gui.code_smell_detector_gui import CodeSmellDetectorGUI
-
-
-@pytest.fixture(scope="session")
-def tk_root():
-    root = tk.Tk()
-    root.withdraw()
-    yield root
-    root.destroy()
 
 
 @pytest.fixture

@@ -1,7 +1,6 @@
 import pytest
 import os
 import pandas as pd
-from tkinter import Tk
 from unittest.mock import Mock, patch
 from gui.code_smell_detector_gui import CodeSmellDetectorGUI
 
@@ -29,7 +28,7 @@ def process_data():
 @patch("gui.code_smell_detector_gui.TextBoxRedirect")
 @patch("components.rule_checker.RuleChecker.rule_check")
 def test_full_integration_with_gui(
-    mock_rule_check, mock_textbox_redirect, integration_setup
+    mock_rule_check, mock_textbox_redirect, integration_setup, tk_root
 ):
     mock_rule_check.return_value = pd.DataFrame(
         [
@@ -48,8 +47,7 @@ def test_full_integration_with_gui(
 
     input_path, output_path = integration_setup
 
-    root = Tk()
-    gui = CodeSmellDetectorGUI(root)
+    gui = CodeSmellDetectorGUI(tk_root)
 
     gui.input_path.configure(text=input_path)
     gui.output_path.configure(text=output_path)
@@ -71,6 +69,8 @@ def test_full_integration_with_gui(
     assert len(df) == 1
     assert df["smell_name"].iloc[0] == "MockedSmell"
 
-    root.destroy()
+    for child in tk_root.winfo_children():
+        child.destroy()
+    tk_root.update_idletasks()
 
     print("Test Passed: Full Integration (GUI → Smells)")

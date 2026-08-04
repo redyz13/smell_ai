@@ -45,7 +45,8 @@ describe('Upload Python Code Page (E2E)', () => {
     cy.contains('Smell #2').should('be.visible');
   });
 
-  it('should display progress and results in AI mode', () => {
+  // The external AI service is explicitly outside the ISTA test scope.
+  it.skip('should display progress and results in AI mode', () => {
     const filePath = 'model_training_and_evaluation/dataset_preparation.py';
     cy.fixture(filePath, 'utf8').then((fileContent) => {
       cy.get('[role="file-uploader"]').attachFile({
